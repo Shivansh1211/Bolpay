@@ -11,6 +11,7 @@ import org.springframework.web.servlet.HandlerInterceptor;
 import java.time.Duration;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import org.springframework.beans.factory.annotation.Value;
 
 /**
  * Rate limiting configuration using Bucket4j
@@ -20,6 +21,9 @@ import java.util.concurrent.ConcurrentHashMap;
 public class RateLimitConfig implements HandlerInterceptor {
 
     private final Map<String, Bucket> ipBuckets = new ConcurrentHashMap<>();
+
+    @Value("${security.trusted-proxies:}")
+    private String trustedProxies;
     
     // OTP: 5 requests per hour per IP
     private static final int OTP_LIMIT = 5;
@@ -45,6 +49,8 @@ public class RateLimitConfig implements HandlerInterceptor {
         
         if (path.contains("/auth/send-otp")) {
             bucket = resolveBucket("otp:" + ip, OTP_LIMIT, OTP_DURATION);
+        } else if (path.contains("/auth/verify-otp")) {
+            bucket = resolveBucket("otp-verify:" + ip, 20, Duration.ofHours(1));
         } else if (path.contains("/orders/create")) {
             bucket = resolveBucket("order:" + ip, ORDER_LIMIT, ORDER_DURATION);
         }
@@ -63,12 +69,13 @@ public class RateLimitConfig implements HandlerInterceptor {
     }
 
     private String getClientIp(HttpServletRequest request) {
-        String ip = request.getHeader("X-Forwarded-For");
-        if (ip == null || ip.isEmpty() || "unknown".equalsIgnoreCase(ip)) {
-            ip = request.getHeader("X-Real-IP");
-        }
-        if (ip == null || ip.isEmpty() || "unknown".equalsIgnoreCase(ip)) {
-            ip = request.getRemoteAddr();
+        String directPeer = request.getRemoteAddr();
+        String ip = directPeer;
+        boolean trustedProxy = trustedProxies != null && java.util.Arrays.stream(trustedProxies.split(","))
+                .map(String::trim).anyMatch(proxy -> proxy.equals(directPeer));
+        if (trustedProxy) {
+            String forwarded = request.getHeader("X-Forwarded-For");
+            if (forwarded != null && !forwarded.isBlank()) ip = forwarded.split(",")[0].trim();
         }
         // Handle multiple IPs in X-Forwarded-For
         if (ip != null && ip.contains(",")) {

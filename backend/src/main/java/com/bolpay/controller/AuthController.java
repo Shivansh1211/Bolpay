@@ -9,8 +9,8 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.beans.factory.annotation.Value;
 
-import java.util.HashMap;
 import java.util.Map;
 
 /**
@@ -24,6 +24,9 @@ public class AuthController {
 
     private final AuthService authService;
 
+    @Value("${otp.return-to-client:false}")
+    private boolean returnOtpToClient;
+
     /**
      * Send OTP to phone number
      * POST /api/auth/send-otp
@@ -31,11 +34,9 @@ public class AuthController {
     @PostMapping("/send-otp")
     public ResponseEntity<Map<String, String>> sendOtp(@Valid @RequestBody SendOtpRequest request) {
         String otp = authService.sendOtp(request.getPhoneNumber());
-        
-        Map<String, String> response = new HashMap<>();
-        response.put("message", "OTP sent successfully");
-        response.put("otp", otp); // Only for demo - remove in production
-        
+        Map<String, String> response = returnOtpToClient
+                ? Map.of("message", "OTP sent successfully", "otp", otp)
+                : Map.of("message", "OTP sent successfully");
         return ResponseEntity.ok(response);
     }
 

@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { vendorAPI } from '../services/api';
+import { authAPI, vendorAPI } from '../services/api';
 import { useAuth } from '../contexts/AuthContext';
 
 const RegisterPage = () => {
@@ -15,7 +15,10 @@ const RegisterPage = () => {
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  const { user, updateUser } = useAuth();
+  const [otpRequested, setOtpRequested] = useState(false);
+  const [otpCode, setOtpCode] = useState('');
+  const [receivedOtp, setReceivedOtp] = useState('');
+  const { user, updateUser, login } = useAuth();
   const navigate = useNavigate();
 
   // Pre-fill phone number from auth context
@@ -35,8 +38,15 @@ const RegisterPage = () => {
     setLoading(true);
 
     try {
-      const response = await vendorAPI.register(formData);
-      updateUser(response.data);
+      if (!otpRequested) {
+        const response = await authAPI.sendOtp(formData.phoneNumber);
+        setReceivedOtp(response.data.otp || '');
+        setOtpRequested(true);
+        return;
+      }
+      const verified = await authAPI.verifyOtp(formData.phoneNumber, otpCode);
+      const response = await vendorAPI.register(formData, verified.data.token);
+      login({ token: verified.data.token, vendor: response.data });
       navigate('/vendor/dashboard');
     } catch (err) {
       setError(err.response?.data?.message || 'Registration failed. Please try again.');
@@ -108,6 +118,14 @@ const RegisterPage = () => {
                 <p className="mt-1 text-xs text-gray-500">Payment destination</p>
               </div>
             </div>
+
+            {otpRequested && (
+              <div>
+                <label htmlFor="registrationOtp" className="block text-sm font-semibold text-gray-700 mb-2">Phone verification code</label>
+                <input id="registrationOtp" name="registrationOtp" inputMode="numeric" autoComplete="one-time-code" maxLength={6} required value={otpCode} onChange={(e) => setOtpCode(e.target.value)} className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl" />
+                {receivedOtp && <p className="mt-2 text-sm text-amber-700">Local demo OTP: {receivedOtp}</p>}
+              </div>
+            )}
 
             <div>
               <label htmlFor="businessName" className="block text-sm font-semibold text-gray-700 mb-2">
@@ -203,7 +221,7 @@ const RegisterPage = () => {
                   </svg>
                   Registering...
                 </span>
-              ) : 'Register Business'}
+              ) : otpRequested ? 'Verify and Register' : 'Send Code'}
             </button>
           </form>
         </div>

@@ -35,6 +35,9 @@ function New-SmokeVendorAndOrder {
     $suffix = [Guid]::NewGuid().ToString('N').Substring(0, 8)
     $phonePrefix = (Get-Random -Minimum 6 -Maximum 10).ToString()
     $phone = $phonePrefix + (Get-Random -Minimum 100000000 -Maximum 999999999).ToString()
+    $otpResponse = Invoke-RestMethod -Method Post -Uri "$BaseUrl/api/auth/send-otp" -ContentType 'application/json' -Body (@{ phoneNumber = $phone } | ConvertTo-Json)
+    if (-not $otpResponse.otp) { throw 'OTP was not returned; the test-only OTP_RETURN_TO_CLIENT flag is required for this smoke test.' }
+    $auth = Invoke-RestMethod -Method Post -Uri "$BaseUrl/api/auth/verify-otp" -ContentType 'application/json' -Body (@{ phoneNumber = $phone; otpCode = $otpResponse.otp } | ConvertTo-Json)
     $vendorBody = @{
         phoneNumber = $phone
         upiId = "smoke-$suffix@upi"
@@ -43,7 +46,7 @@ function New-SmokeVendorAndOrder {
         description = 'Step 1 API smoke test'
     } | ConvertTo-Json
 
-    $vendor = Invoke-RestMethod -Method Post -Uri "$BaseUrl/api/vendor/register" -ContentType 'application/json' -Body $vendorBody
+    $vendor = Invoke-RestMethod -Method Post -Uri "$BaseUrl/api/vendor/register" -Headers @{ Authorization = "Bearer $($auth.token)" } -ContentType 'application/json' -Body $vendorBody
     if ($vendor.slug -ne "smoke-$suffix") { throw 'Vendor registration did not return the requested slug.' }
 
     $orderBody = @{ vendorSlug = $vendor.slug; amount = 60.00 } | ConvertTo-Json
@@ -84,6 +87,7 @@ try {
         '-e', 'PAYMENT_GATEWAY=mock', '-e', 'CASHFREE_BASE_URL=http://mock-cashfree:9000',
         '-e', 'CASHFREE_CLIENT_ID=bolpay-mock-client', '-e', 'CASHFREE_CLIENT_SECRET=bolpay-mock-client-secret',
         '-e', 'CASHFREE_WEBHOOK_SECRET=bolpay-mock-webhook-secret',
+        '-e', 'OTP_RETURN_TO_CLIENT=true',
         'bolpay-backend'
     ) | Out-Null
     Write-Host 'Starting backend against the empty smoke database...'
@@ -91,13 +95,13 @@ try {
     Write-Host 'PASS: backend started with PAYMENT_GATEWAY=mock.'
 
     $migrationState = docker exec $dbName psql -U bolpay_smoke -d bolpay_smoke -Atc "select count(*) || ':' || bool_and(success) || ':' || max(version) from flyway_schema_history where success"
-    if ($LASTEXITCODE -ne 0 -or $migrationState.Trim() -ne '5:true:5') {
-        throw "Expected five successful migrations on the empty database; got '$($migrationState.Trim())'."
+    if ($LASTEXITCODE -ne 0 -or $migrationState.Trim() -ne '6:true:6') {
+        throw "Expected six successful migrations on the empty database; got '$($migrationState.Trim())'."
     }
-    Write-Host 'PASS: Flyway applied V1-V5 successfully to an empty database.'
+    Write-Host 'PASS: Flyway applied V1-V6 successfully to an empty database.'
 
     $flow = New-SmokeVendorAndOrder 'http://localhost:18080'
-    Write-Host "PASS: API created vendor '$($flow.Vendor.slug)' and order token '$($flow.Order.token)' with payment_session_id."
+    Write-Host "PASS: API created vendor '$($flow.Vendor.slug)' and order with a valid token and payment_session_id (values withheld)."
     $checkout = Invoke-WebRequest -UseBasicParsing -Uri "http://localhost:5173/checkout/$($flow.Order.paymentSessionId)"
     if ($checkout.StatusCode -ne 200 -or $checkout.Content -notmatch 'Simulated money') {
         throw 'Nginx did not forward the payment session to the simulated checkout.'
@@ -105,7 +109,7 @@ try {
     Write-Host 'PASS: mock service accepted payment_session_id through nginx /checkout/.'
 
     $publicFlow = New-SmokeVendorAndOrder 'http://localhost:8080'
-    Write-Host "PASS: running Compose API created vendor '$($publicFlow.Vendor.slug)' and order token '$($publicFlow.Order.token)' with payment_session_id."
+    Write-Host "PASS: running Compose API created vendor '$($publicFlow.Vendor.slug)' and order with a valid token and payment_session_id (values withheld)."
     $checkout2 = Invoke-WebRequest -UseBasicParsing -Uri "http://localhost:5173/checkout/$($publicFlow.Order.paymentSessionId)"
     if ($checkout2.StatusCode -ne 200 -or $checkout2.Content -notmatch 'Simulated money') {
         throw 'The running Compose order payment_session_id was not accepted by mock checkout.'

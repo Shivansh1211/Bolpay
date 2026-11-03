@@ -40,6 +40,7 @@ public class SecurityConfig {
                         // Public endpoints
                         .requestMatchers("/api/auth/send-otp", "/api/auth/verify-otp").permitAll()
                         .requestMatchers("/api/public/**").permitAll()
+                        .requestMatchers("/api/vendor/public/vendor/**").permitAll()
                         .requestMatchers("/v/{slug}").permitAll()
                         // Vendor registration (public for new users)
                         .requestMatchers("/api/vendor/register").permitAll()

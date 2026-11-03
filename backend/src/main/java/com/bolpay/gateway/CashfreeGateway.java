@@ -41,6 +41,9 @@ public class CashfreeGateway implements PaymentGateway {
     @Value("${cashfree.client-secret}")
     private String clientSecret;
 
+    @Value("${cashfree.webhook-secret}")
+    private String webhookSecret;
+
     @Value("${cashfree.api-version}")
     private String apiVersion;
 
@@ -162,7 +165,7 @@ public class CashfreeGateway implements PaymentGateway {
     private String generateSignature(String payload) {
         try {
             Mac mac = Mac.getInstance("HmacSHA256");
-            SecretKeySpec secretKeySpec = new SecretKeySpec(clientSecret.getBytes(StandardCharsets.UTF_8), "HmacSHA256");
+            SecretKeySpec secretKeySpec = new SecretKeySpec(webhookSecret.getBytes(StandardCharsets.UTF_8), "HmacSHA256");
             mac.init(secretKeySpec);
             byte[] hash = mac.doFinal(payload.getBytes(StandardCharsets.UTF_8));
             return Base64.getEncoder().encodeToString(hash);

@@ -13,6 +13,7 @@ import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.security.MessageDigest;
@@ -116,6 +117,7 @@ public class OrderService {
     /**
      * Get order by code
      */
+    @Transactional(readOnly = true)
     public OrderDto getOrderByCode(String orderCode) {
         return orderRepository.findByOrderCode(orderCode)
                 .map(this::mapToDto)

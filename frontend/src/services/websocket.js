@@ -4,11 +4,12 @@ import Stomp from 'stompjs';
 let stompClient = null;
 let subscriptions = [];
 
-export const connectWebSocket = (onMessageCallback, vendorId) => {
+export const connectWebSocket = (onMessageCallback, vendorId, token) => {
   const socket = new SockJS('http://localhost:8080/ws');
   stompClient = Stomp.over(socket);
+  stompClient.reconnect_delay = 3000;
 
-  stompClient.connect({}, () => {
+  stompClient.connect({ Authorization: `Bearer ${token}` }, () => {
     console.log('WebSocket connected');
     
     // Subscribe to vendor-specific topic

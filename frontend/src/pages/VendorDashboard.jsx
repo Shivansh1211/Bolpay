@@ -133,7 +133,7 @@ const VendorDashboard = () => {
         setTimeout(() => {
           setShowPaymentAlert(false);
         }, 5000);
-      }, user.id);
+      }, user.id, localStorage.getItem('token'));
     }
 
     return () => {

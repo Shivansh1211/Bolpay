@@ -2,6 +2,7 @@ package com.bolpay.controller;
 
 import com.bolpay.dto.RegisterVendorRequest;
 import com.bolpay.dto.VendorDto;
+import com.bolpay.dto.PublicVendorDto;
 import com.bolpay.service.AuthService;
 import com.bolpay.service.VendorService;
 import jakarta.servlet.http.HttpServletRequest;
@@ -28,7 +29,12 @@ public class VendorController {
      * POST /api/vendor/register
      */
     @PostMapping("/register")
-    public ResponseEntity<VendorDto> registerVendor(@Valid @RequestBody RegisterVendorRequest request) {
+    public ResponseEntity<VendorDto> registerVendor(@Valid @RequestBody RegisterVendorRequest request,
+            @RequestHeader(value = "Authorization", required = false) String authorization) {
+        if (authorization == null || !authorization.startsWith("Bearer ")
+                || !authService.isOtpProofForPhone(authorization.substring(7), request.getPhoneNumber())) {
+            return ResponseEntity.status(401).build();
+        }
         VendorDto vendor = vendorService.registerVendor(request);
         return ResponseEntity.ok(vendor);
     }
@@ -73,14 +79,15 @@ public class VendorController {
      * GET /api/public/vendor/{slug}
      */
     @GetMapping("/public/vendor/{slug}")
-    public ResponseEntity<VendorDto> getVendorBySlug(@PathVariable String slug) {
+    public ResponseEntity<PublicVendorDto> getVendorBySlug(@PathVariable String slug) {
         VendorDto vendor = vendorService.getVendorBySlug(slug);
         
         if (vendor == null) {
             return ResponseEntity.notFound().build();
         }
         
-        return ResponseEntity.ok(vendor);
+        return ResponseEntity.ok(new PublicVendorDto(vendor.getSlug(), vendor.getBusinessName(),
+                vendor.getDescription(), vendor.getBannerUrl()));
     }
 
     /**

@@ -33,6 +33,9 @@ services:
       CASHFREE_CLIENT_ID: ${CASHFREE_CLIENT_ID:-bolpay-mock-client}
       CASHFREE_CLIENT_SECRET: ${CASHFREE_CLIENT_SECRET:-bolpay-mock-client-secret}
       CASHFREE_WEBHOOK_SECRET: ${CASHFREE_WEBHOOK_SECRET:-bolpay-mock-webhook-secret}
+      MOCK_ADMIN_PASSWORD: ${MOCK_ADMIN_PASSWORD:-}
+      OTP_RETURN_TO_CLIENT: ${OTP_RETURN_TO_CLIENT:-false}
+      TRUSTED_PROXIES: ${TRUSTED_PROXIES:-}
       PUBLIC_BASE_URL: ${PUBLIC_BASE_URL:-http://localhost:5173}
       ML_SERVICE_URL: http://ml-service:5000
     depends_on:

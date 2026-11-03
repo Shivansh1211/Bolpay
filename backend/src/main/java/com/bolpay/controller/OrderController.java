@@ -48,10 +48,10 @@ public class OrderController {
      * GET /api/orders/{orderCode}
      */
     @GetMapping("/{orderCode}")
-    public ResponseEntity<OrderDto> getOrderByCode(@PathVariable String orderCode) {
+    public ResponseEntity<OrderDto> getOrderByCode(@PathVariable String orderCode, org.springframework.security.core.Authentication authentication) {
         OrderDto order = orderService.getOrderByCode(orderCode);
-        
-        if (order == null) {
+        Long vendorId = authService.extractVendorIdFromAuthentication(authentication);
+        if (order == null || !vendorId.equals(order.getVendorId())) {
             return ResponseEntity.notFound().build();
         }
         
@@ -97,10 +97,11 @@ public class OrderController {
      * GET /api/orders/quick-check/{orderCode}
      */
     @GetMapping("/quick-check/{orderCode}")
-    public ResponseEntity<Map<String, Object>> quickCheckOrder(@PathVariable String orderCode) {
+    public ResponseEntity<Map<String, Object>> quickCheckOrder(@PathVariable String orderCode, org.springframework.security.core.Authentication authentication) {
         OrderDto order = orderService.getOrderByCode(orderCode);
+        Long vendorId = authService.extractVendorIdFromAuthentication(authentication);
         
-        if (order == null) {
+        if (order == null || !vendorId.equals(order.getVendorId())) {
             return ResponseEntity.ok(Map.of(
                     "found", false,
                     "message", "Order not found"

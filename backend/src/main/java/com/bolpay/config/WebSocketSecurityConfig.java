@@ -45,10 +45,13 @@ public class WebSocketSecurityConfig implements ChannelInterceptor {
             
             String phoneNumber = authService.extractPhoneNumber(token);
             Long vendorId = authService.extractVendorId(token);
+            if (vendorId == null) {
+                throw new IllegalArgumentException("Vendor account is not registered");
+            }
             
             // Set authentication in the session
             accessor.setUser(new UsernamePasswordAuthenticationToken(
-                phoneNumber,
+                vendorId.toString(),
                 null,
                 Collections.singletonList(new SimpleGrantedAuthority("ROLE_VENDOR"))
             ));
@@ -61,17 +64,9 @@ public class WebSocketSecurityConfig implements ChannelInterceptor {
             
             // Verify subscription is to correct vendor topic
             if (destination != null && destination.startsWith("/topic/vendor/")) {
-                String[] parts = destination.split("/");
-                if (parts.length >= 4) {
-                    String requestedVendorId = parts[3];
-                    
-                    // Get vendor ID from authenticated user
-                    if (accessor.getUser() != null) {
-                        String phoneNumber = accessor.getUser().getName();
-                        // Verify the user can only subscribe to their own topic
-                        // This is a simplified check - in production, verify vendorId matches
-                        log.debug("User {} subscribing to {}", phoneNumber, destination);
-                    }
+                if (accessor.getUser() == null || !destination.matches("/topic/vendor/[0-9]+")
+                        || !destination.equals("/topic/vendor/" + accessor.getUser().getName())) {
+                    throw new IllegalArgumentException("Subscription is not authorized");
                 }
             }
         }

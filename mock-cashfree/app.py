@@ -6,6 +6,7 @@ import time
 import secrets
 import json
 import os
+from functools import wraps
 from datetime import datetime, timedelta
 
 app = Flask(__name__)
@@ -15,6 +16,18 @@ CLIENT_ID = os.environ.get("CASHFREE_CLIENT_ID", "bolpay-mock-client")
 CLIENT_SECRET = os.environ.get("CASHFREE_CLIENT_SECRET", "bolpay-mock-client-secret")
 WEBHOOK_SECRET = os.environ.get("CASHFREE_WEBHOOK_SECRET", "bolpay-mock-webhook-secret")
 API_VERSION = "2025-01-01"
+ADMIN_PASSWORD = os.environ.get("MOCK_ADMIN_PASSWORD", "")
+
+def require_admin(view):
+    @wraps(view)
+    def wrapped(*args, **kwargs):
+        if not ADMIN_PASSWORD:
+            return "Not found", 404
+        supplied = request.authorization.password if request.authorization else ""
+        if not hmac.compare_digest(supplied, ADMIN_PASSWORD):
+            return "Authentication required", 401, {"WWW-Authenticate": 'Basic realm="BolPay mock controls"'}
+        return view(*args, **kwargs)
+    return wrapped
 
 # In-memory storage for orders
 orders = {}
@@ -207,21 +220,21 @@ CHECKOUT_HTML = """
                 
                 <h3 style="text-align: center; color: #333; margin-bottom: 16px; font-size: 16px;">Choose Payment App</h3>
                 <div class="upi-apps">
-                    <div class="upi-app" onclick="openConfirm('PhonePe')">
+                    <div class="upi-app" onclick="openConfirm('UPI app 1')">
                         <div class="upi-app-icon">📱</div>
-                        <div class="upi-app-name">PhonePe</div>
+                        <div class="upi-app-name">UPI app 1</div>
                     </div>
-                    <div class="upi-app" onclick="openConfirm('Google Pay')">
+                    <div class="upi-app" onclick="openConfirm('UPI app 2')">
                         <div class="upi-app-icon">�</div>
-                        <div class="upi-app-name">Google Pay</div>
+                        <div class="upi-app-name">UPI app 2</div>
                     </div>
-                    <div class="upi-app" onclick="openConfirm('Paytm')">
+                    <div class="upi-app" onclick="openConfirm('UPI app 3')">
                         <div class="upi-app-icon">�</div>
-                        <div class="upi-app-name">Paytm</div>
+                        <div class="upi-app-name">UPI app 3</div>
                     </div>
-                    <div class="upi-app" onclick="openConfirm('BHIM')">
+                    <div class="upi-app" onclick="openConfirm('UPI app 4')">
                         <div class="upi-app-icon">🇮🇳</div>
-                        <div class="upi-app-name">BHIM</div>
+                        <div class="upi-app-name">UPI app 4</div>
                     </div>
                 </div>
                 
@@ -251,7 +264,7 @@ CHECKOUT_HTML = """
             
             <div class="content">
                 <div class="selected-app-display" id="selected-app-display">
-                    PhonePe
+                    Selected UPI app
                 </div>
                 
                 <div class="payee-info">
@@ -506,6 +519,7 @@ def mock_sdk():
     return js_code, 200, {'Content-Type': 'application/javascript'}
 
 @app.route('/mock-admin', methods=['GET'])
+@require_admin
 def mock_admin():
     """Mock admin panel for attack testing"""
     return render_template_string("""
@@ -577,6 +591,7 @@ def mock_admin():
     """, orders=json.dumps(orders, indent=2))
 
 @app.route('/admin/attack/<attack_type>', methods=['POST'])
+@require_admin
 def execute_attack(attack_type):
     """Execute attack scenarios"""
     data = request.json
@@ -650,4 +665,4 @@ def send_to_backend(url, payload, signature, timestamp=None, headers=None):
         return jsonify({'status': 'error', 'error': str(e)})
 
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=9000, debug=True)
+    app.run(host='0.0.0.0', port=9000, debug=False)

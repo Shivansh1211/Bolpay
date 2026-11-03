@@ -19,6 +19,6 @@ public class WebMvcConfig implements WebMvcConfigurer {
     @Override
     public void addInterceptors(InterceptorRegistry registry) {
         registry.addInterceptor(rateLimitConfig)
-                .addPathPatterns("/api/auth/send-otp", "/api/orders/create");
+                .addPathPatterns("/api/auth/send-otp", "/api/auth/verify-otp", "/api/orders/create");
     }
 }

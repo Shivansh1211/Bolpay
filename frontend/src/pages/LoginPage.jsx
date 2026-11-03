@@ -20,7 +20,7 @@ const LoginPage = () => {
 
     try {
       const response = await authAPI.sendOtp(phoneNumber);
-      setReceivedOtp(response.data.otp); // Demo only - shows OTP
+      setReceivedOtp(response.data.otp || '');
       setOtpSent(true);
     } catch (err) {
       setError('Failed to send OTP. Please try again.');

@@ -8,10 +8,14 @@ import org.springframework.http.*;
 import org.springframework.web.client.RestTemplate;
 
 import java.math.BigDecimal;
+import java.nio.charset.StandardCharsets;
+import java.util.Base64;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+import javax.crypto.Mac;
+import javax.crypto.spec.SecretKeySpec;
 
 /**
  * Mock payment gateway for demo/testing
@@ -25,6 +29,7 @@ public class MockGateway implements PaymentGateway {
     @Value("${cashfree.internal-url}") private String gatewayUrl;
     @Value("${cashfree.client-id}") private String clientId;
     @Value("${cashfree.client-secret}") private String clientSecret;
+    @Value("${cashfree.webhook-secret}") private String webhookSecret;
     private final RestTemplate restTemplate = new RestTemplate();
 
     private final Map<String, Boolean> simulatedPayments = new ConcurrentHashMap<>();
@@ -54,9 +59,16 @@ public class MockGateway implements PaymentGateway {
 
     @Override
     public boolean verifyWebhookSignature(String signature, String payload) {
-        // Mock gateway always accepts signatures for demo
-        log.debug("MockGateway: Signature verification (mock - always true)");
-        return true;
+        try {
+            Mac mac = Mac.getInstance("HmacSHA256");
+            mac.init(new SecretKeySpec(webhookSecret.getBytes(StandardCharsets.UTF_8), "HmacSHA256"));
+            String expected = Base64.getEncoder().encodeToString(mac.doFinal(payload.getBytes(StandardCharsets.UTF_8)));
+            return signature != null && java.security.MessageDigest.isEqual(
+                    expected.getBytes(StandardCharsets.US_ASCII), signature.getBytes(StandardCharsets.US_ASCII));
+        } catch (Exception e) {
+            log.error("Mock webhook signature verification failed", e);
+            return false;
+        }
     }
 
     @Override

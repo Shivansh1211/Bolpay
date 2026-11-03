@@ -6,6 +6,7 @@ import org.springframework.messaging.simp.config.MessageBrokerRegistry;
 import org.springframework.web.socket.config.annotation.EnableWebSocketMessageBroker;
 import org.springframework.web.socket.config.annotation.StompEndpointRegistry;
 import org.springframework.web.socket.config.annotation.WebSocketMessageBrokerConfigurer;
+import org.springframework.beans.factory.annotation.Value;
 
 /**
  * WebSocket configuration for real-time updates using STOMP
@@ -16,6 +17,9 @@ import org.springframework.web.socket.config.annotation.WebSocketMessageBrokerCo
 public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
 
     private final WebSocketSecurityConfig webSocketSecurityConfig;
+
+    @Value("${cors.allowed-origins:http://localhost:5173}")
+    private String allowedOrigins;
 
     @Override
     public void configureMessageBroker(MessageBrokerRegistry config) {
@@ -32,7 +36,7 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
         // Register a STOMP endpoint at "/ws" that clients will connect to
         // Enable SockJS fallback options for browsers that don't support WebSocket
         registry.addEndpoint("/ws")
-                .setAllowedOriginPatterns("http://localhost:5173")
+                .setAllowedOriginPatterns(allowedOrigins.split(","))
                 .withSockJS();
     }
 

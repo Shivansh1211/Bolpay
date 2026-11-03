@@ -1,10 +1,10 @@
 # BolPay - Payment Verification Platform
 
-A secure payment verification platform for small Indian vendors (paratha stalls, tea carts, autos) to prevent scams from fake "payment successful" screens in modded payment apps.
+A payment verification dashboard prototype for small Indian vendors (paratha stalls, tea carts, autos) to help review payment status against server-side gateway events.
 
 ## Core Problem
 
-Fake payment apps never move money. BolPay ensures vendors trust ONLY server-confirmed payments. Every payment is tied to an order created BEFORE the customer pays, and the vendor sees PAID only when the payment gateway's webhook confirms it.
+BolPay displays payment state for an order created before checkout. The local mock gateway and automated tests exercise this flow; a production gateway, operational controls, and real-world validation are not established by this repository. The UI is not a guarantee against fraud.
 
 ## System Overview
 
@@ -12,7 +12,7 @@ BolPay provides:
 - **Token-based verification**: Short tokens (e.g., K72) for quick vendor checks
 - **Real-time dashboard**: WebSocket-powered live payment notifications
 - **Glance mode**: High-contrast simplified view for busy vendors
-- **Fraud detection**: ML-based anomaly scoring for suspicious patterns
+- **Risk scoring prototype**: ML service integration for anomaly scoring
 - **Research mode**: Data collection for ML model training
 - **Incident logging**: Automatic escalation of unresolved expired orders
 
@@ -89,18 +89,9 @@ Configurable timers (via environment variables):
 - **expire-after**: 150 seconds - order expires if unpaid
 - **escalate-after**: 240 seconds - unresolved expired orders escalate to incident log
 
-## Completed Phases
+## Project status
 
-All 7 phases have been completed:
-
-- **Phase 0**: Audit current codebase against new specification
-- **Phase 1**: Security fixes + tests (IDOR fix, JWT enforcement, OTP hashing, CORS tightening, security headers, rate limiting, WebSocket JWT auth, input validation, sanitization, webhook security)
-- **Phase 2**: mock-cashfree service + CashfreeGateway + webhook handler
-- **Phase 3**: Order/token/session logic + timers + reconciliation
-- **Phase 4**: Vendor board, glance mode, QR card, customer page
-- **Phase 5**: ML service + evaluation
-- **Phase 6**: Research mode + incident log + attack suite + load test
-- **Phase 7**: Documentation
+This repository is a prototype under active verification. See [docs/PROGRESS.md](docs/PROGRESS.md), [docs/limitations.md](docs/limitations.md), and [docs/attack-results.md](docs/attack-results.md) for verified status and gaps.
 
 ## Setup Instructions
 

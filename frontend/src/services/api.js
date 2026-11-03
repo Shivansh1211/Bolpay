@@ -24,7 +24,7 @@ export const authAPI = {
 };
 
 export const vendorAPI = {
-  register: (data) => api.post('/api/vendor/register', data),
+  register: (data, otpProof) => api.post('/api/vendor/register', data, { headers: { Authorization: `Bearer ${otpProof}` } }),
   getProfile: () => api.get('/api/vendor/profile'),
   updateProfile: (data) => api.put('/api/vendor/profile', data),
   getBySlug: (slug) => api.get(`/api/vendor/public/vendor/${slug}`),

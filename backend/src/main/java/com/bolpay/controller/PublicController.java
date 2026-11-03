@@ -1,6 +1,7 @@
 package com.bolpay.controller;
 
 import com.bolpay.entity.Vendor;
+import com.bolpay.dto.PublicVendorDto;
 import com.bolpay.repository.VendorRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -42,9 +43,9 @@ public class PublicController {
      * GET /api/vendors/{id}
      */
     @GetMapping("/vendors/{id}")
-    public ResponseEntity<Vendor> getVendorById(@PathVariable Long id) {
+    public ResponseEntity<PublicVendorDto> getVendorById(@PathVariable Long id) {
         return vendorRepository.findById(id)
-                .map(ResponseEntity::ok)
+                .map(v -> ResponseEntity.ok(new PublicVendorDto(v.getSlug(), v.getBusinessName(), v.getDescription(), v.getBannerUrl())))
                 .orElse(ResponseEntity.notFound().build());
     }
 }

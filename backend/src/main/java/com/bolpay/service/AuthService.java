@@ -44,9 +44,28 @@ public class AuthService {
      * Generate JWT token for a vendor
      */
     public String generateToken(String phoneNumber, Long vendorId) {
+        return generateToken(phoneNumber, vendorId, false);
+    }
+
+    public String generateOtpProofToken(String phoneNumber) {
+        return generateToken(phoneNumber, null, true);
+    }
+
+    public boolean isOtpProofForPhone(String token, String phoneNumber) {
+        try {
+            Claims claims = Jwts.parserBuilder().setSigningKey(getSigningKey()).build().parseClaimsJws(token).getBody();
+            return Boolean.TRUE.equals(claims.get("otpVerified", Boolean.class))
+                    && claims.get("vendorId") == null && phoneNumber.equals(claims.getSubject());
+        } catch (Exception ex) {
+            return false;
+        }
+    }
+
+    private String generateToken(String phoneNumber, Long vendorId, boolean otpVerified) {
         Map<String, Object> claims = new HashMap<>();
         claims.put("phoneNumber", phoneNumber);
         claims.put("vendorId", vendorId);
+        claims.put("otpVerified", otpVerified);
 
         return Jwts.builder()
                 .setClaims(claims)
@@ -136,7 +155,7 @@ public class AuthService {
         if (isNewUser) {
             // New user - return token without vendor data
             // They will need to register
-            token = generateToken(phoneNumber, null);
+            token = generateOtpProofToken(phoneNumber);
             vendorDto = null;
         } else {
             // Existing user - return token with vendor data
