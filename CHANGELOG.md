@@ -6,3 +6,10 @@
 - Scoped order reads and vendor WebSocket topics to the authenticated vendor; limited forwarded-IP trust to configured proxies and protected mock admin/attack routes.
 - Added regression coverage for forged, unsigned, malformed, duplicate, and wrong-amount webhooks; OTP registration and secrecy; vendor data isolation; public DTO privacy; and WebSocket topic isolation.
 - Replaced misleading Step 2/attack documentation claims with the tested behavior and known test limitations.
+- Persisted customer scan sessions with hashed device identifiers and a per-IP scan request limit; the vendor board now counts stored scans from the recent 10-minute window.
+- Added V7 with a partial unique index for pending vendor tokens and a pessimistic vendor-row lock; token allocation retries unused 2-digit candidates and only searches 3-digit candidates after 2-digit exhaustion.
+- Inserted the pending order before creating a gateway session so token uniqueness is checked before the external mock request.
+- Made order reconciliation query pending orders older than its configured minimum age and exposed test-configurable expiry/reconciliation timers.
+- Updated the mock gateway's drop-webhook flow to retain paid gateway state; mock status lookup now lets reconciliation recover the paid order.
+- Replaced the fake-screen test's manual expiry with the scheduled expiry path and replaced manual lost-webhook state changes with the mock drop/reconcile flow.
+- Added concurrency and token fallback tests; the Docker smoke flow now verifies V1-V7 and a persisted scan session.

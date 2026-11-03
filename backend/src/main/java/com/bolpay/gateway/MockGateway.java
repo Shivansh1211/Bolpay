@@ -91,13 +91,26 @@ public class MockGateway implements PaymentGateway {
 
     @Override
     public PaymentStatus getPaymentStatus(String gatewayRef) {
-        // For mock, return SUCCESS if we simulated it
-        if (gatewayRef.startsWith("MOCK_")) {
-            // In a real implementation, we'd check the simulatedPayments map
-            // For now, return UNKNOWN as status is managed by the order entity
+        try {
+            String orderCode = gatewayRef != null && gatewayRef.startsWith("CF_")
+                    ? gatewayRef.substring(3) : gatewayRef;
+            HttpHeaders headers = new HttpHeaders();
+            headers.set("x-client-id", clientId);
+            headers.set("x-client-secret", clientSecret);
+            headers.set("x-api-version", "2025-01-01");
+            Map response = restTemplate.exchange(gatewayUrl + "/pg/orders/" + orderCode,
+                    HttpMethod.GET, new HttpEntity<>(headers), Map.class).getBody();
+            if (response == null) return PaymentStatus.UNKNOWN;
+            return switch (String.valueOf(response.get("order_status"))) {
+                case "PAID" -> PaymentStatus.SUCCESS;
+                case "ACTIVE", "PENDING" -> PaymentStatus.PENDING;
+                case "FAILED", "EXPIRED" -> PaymentStatus.FAILED;
+                default -> PaymentStatus.UNKNOWN;
+            };
+        } catch (Exception e) {
+            log.warn("Mock gateway status lookup failed");
             return PaymentStatus.UNKNOWN;
         }
-        return PaymentStatus.UNKNOWN;
     }
 
     /**

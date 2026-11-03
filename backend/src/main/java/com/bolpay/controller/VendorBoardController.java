@@ -5,6 +5,7 @@ import com.bolpay.entity.IncidentLog;
 import com.bolpay.service.AuthService;
 import com.bolpay.service.IncidentLogService;
 import com.bolpay.service.OrderService;
+import com.bolpay.service.ScanSessionService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
@@ -29,6 +30,7 @@ public class VendorBoardController {
     private final OrderService orderService;
     private final IncidentLogService incidentLogService;
     private final AuthService authService;
+    private final ScanSessionService scanSessionService;
 
     /**
      * Get vendor board data
@@ -55,8 +57,8 @@ public class VendorBoardController {
         // Get unresolved incidents
         List<IncidentLog> unresolvedIncidents = incidentLogService.getUnresolvedIncidents(vendorId);
         
-        // Get scan count (simplified - in production, this would come from a scan tracking table)
-        int scannedCount = pendingOrders.size() + recentPaidOrders.size();
+        int scannedCount = Math.toIntExact(scanSessionService.countRecentScans(
+                vendorId, LocalDateTime.now().minusMinutes(10)));
         
         Map<String, Object> response = new HashMap<>();
         response.put("scanned", scannedCount);

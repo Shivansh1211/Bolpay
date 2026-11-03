@@ -4,7 +4,7 @@
 
 Command: `pwsh -File tests/run-all.ps1` (Docker Compose, PostgreSQL 15, Spring Boot test profile, mock payment gateway).
 
-Result: **14 Maven tests passed, 0 failed, 0 errored, 0 skipped**, followed by passing API/Compose smoke checks ending in `ALL TESTS PASSED.` This is local automated evidence, not proof of production security or fraud prevention.
+Result: **18 Maven tests passed, 0 failed, 0 errored, 0 skipped**, followed by passing API/Compose smoke checks ending in `ALL TESTS PASSED.` This is local automated evidence, not proof of production security or fraud prevention.
 
 ## Coverage in the verified suite
 
@@ -13,12 +13,13 @@ Result: **14 Maven tests passed, 0 failed, 0 errored, 0 skipped**, followed by p
 - Registration without OTP proof is rejected; OTP is omitted from the default response.
 - Public vendor responses omit phone and UPI values; a vendor cannot read another vendor's order by code or quick-check token.
 - A WebSocket subscription to another vendor's topic is rejected.
+- Concurrent order creation is checked for distinct active tokens; token fallback is checked after all 2-digit candidates are occupied.
+- The fake-screen test now waits for the short test expiry timer and observes the scheduled expiry job.
+- The lost-webhook test uses the mock gateway's drop option, then calls reconciliation against the gateway's retained PAID state.
 - Other suite cases exercise payment state/replay scenarios.
 
 ## Test limitations
 
-- The fake-screen test waits two seconds, then directly changes the row to EXPIRED. It does not prove that the real expiry scheduler fires.
-- The lost-webhook test directly marks the order PAID. It does not call a reconciliation adapter or prove recovery after a dropped gateway webhook.
 - The duplicate test checks the final paid state but does not count emitted WebSocket announcements or exercise simultaneous duplicate deliveries.
 - This run did not include Playwright browser coverage, a sustained load test, real-phone use, or a live payment gateway.
 - Webhook signature verification uses the local mock secret. Cashfree account behavior is not validated here.

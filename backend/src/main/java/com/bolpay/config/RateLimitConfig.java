@@ -32,6 +32,8 @@ public class RateLimitConfig implements HandlerInterceptor {
     // Order creation: 20 requests per minute per IP
     private static final int ORDER_LIMIT = 20;
     private static final Duration ORDER_DURATION = Duration.ofMinutes(1);
+    private static final int SCAN_LIMIT = 30;
+    private static final Duration SCAN_DURATION = Duration.ofMinutes(1);
 
     private Bucket resolveBucket(String key, int limit, Duration duration) {
         return ipBuckets.computeIfAbsent(key, k -> {
@@ -53,6 +55,8 @@ public class RateLimitConfig implements HandlerInterceptor {
             bucket = resolveBucket("otp-verify:" + ip, 20, Duration.ofHours(1));
         } else if (path.contains("/orders/create")) {
             bucket = resolveBucket("order:" + ip, ORDER_LIMIT, ORDER_DURATION);
+        } else if (path.startsWith("/api/public/scan/")) {
+            bucket = resolveBucket("scan:" + ip, SCAN_LIMIT, SCAN_DURATION);
         }
         
         if (bucket != null) {

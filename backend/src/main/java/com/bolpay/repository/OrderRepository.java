@@ -24,6 +24,8 @@ public interface OrderRepository extends JpaRepository<Order, Long> {
 
     List<Order> findByStatusAndCreatedAtAfter(Order.OrderStatus status, LocalDateTime after);
 
+    List<Order> findByStatusAndCreatedAtBefore(Order.OrderStatus status, LocalDateTime before);
+
     List<Order> findByVendorIdAndCreatedAtAfter(Long vendorId, LocalDateTime after);
 
     List<Order> findByDeviceFingerprintHashAndCreatedAtAfter(String deviceFingerprintHash, LocalDateTime after);

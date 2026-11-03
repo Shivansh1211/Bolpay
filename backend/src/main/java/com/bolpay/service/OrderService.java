@@ -20,7 +20,9 @@ import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.time.LocalDateTime;
 import java.util.List;
-import java.util.Random;
+import java.security.SecureRandom;
+import java.util.ArrayList;
+import java.util.Collections;
 
 /**
  * Service for order operations
@@ -45,6 +47,9 @@ public class OrderService {
     private int escalateAfterSeconds;
 
     private static final int ORDER_CODE_LENGTH = 8;
+    private static final String TOKEN_LETTERS = "ABCDEFGHJKLMNPQRSTUVWXYZ";
+    private static final String TOKEN_DIGITS = "23456789";
+    private static final SecureRandom RANDOM = new SecureRandom();
 
     /**
      * Create a new payment order
@@ -52,7 +57,7 @@ public class OrderService {
     @Transactional
     public OrderDto createOrder(CreateOrderRequest request, String deviceFingerprint) {
         // Get vendor by slug
-        Vendor vendor = vendorRepository.findBySlug(request.getVendorSlug())
+        Vendor vendor = vendorRepository.findBySlugForUpdate(request.getVendorSlug())
                 .orElseThrow(() -> new IllegalArgumentException("Vendor not found"));
 
         if (!vendor.getIsActive()) {
@@ -66,10 +71,7 @@ public class OrderService {
         }
 
         // Generate token (1 letter + 2-3 digits, unique per vendor among ACTIVE orders)
-        String token = generateToken(vendor.getId());
-        while (orderRepository.findByVendorIdAndTokenAndStatus(vendor.getId(), token, Order.OrderStatus.PENDING).isPresent()) {
-            token = generateToken(vendor.getId());
-        }
+        String token = allocateActiveToken(vendor.getId());
 
         // Hash device fingerprint and payer info
         String deviceFingerprintHash = hashString(deviceFingerprint);
@@ -77,19 +79,8 @@ public class OrderService {
                 ? hashString(request.getCustomerPhone()) 
                 : null;
 
-        // Create payment via gateway
-        PaymentGateway.PaymentResult paymentResult = paymentGateway.createPayment(
-                orderCode,
-                request.getAmount(),
-                vendor.getUpiId(),
-                request.getCustomerPhone()
-        );
-
-        if (!paymentResult.success()) {
-            throw new RuntimeException("Failed to create payment: " + paymentResult.errorMessage());
-        }
-
-        // Create order
+        // Insert the row before calling the gateway so the database checks the active token
+        // uniqueness constraint before an external payment session is created.
         LocalDateTime now = LocalDateTime.now();
         Order order = Order.builder()
                 .vendor(vendor)
@@ -98,8 +89,6 @@ public class OrderService {
                 .amount(request.getAmount())
                 .orderCode(orderCode)
                 .token(token)
-                .paymentSessionId(paymentResult.paymentSessionId())
-                .gatewayRef(paymentResult.gatewayRef())
                 .createdAt(now)
                 .expiresAt(now.plusSeconds(expireAfterSeconds))
                 .escalateAt(now.plusSeconds(escalateAfterSeconds))
@@ -107,6 +96,15 @@ public class OrderService {
                 .payerHash(payerHash)
                 .build();
 
+        order = orderRepository.saveAndFlush(order);
+
+        PaymentGateway.PaymentResult paymentResult = paymentGateway.createPayment(
+                orderCode, request.getAmount(), vendor.getUpiId(), request.getCustomerPhone());
+        if (!paymentResult.success()) {
+            throw new RuntimeException("Failed to create payment: " + paymentResult.errorMessage());
+        }
+        order.setPaymentSessionId(paymentResult.paymentSessionId());
+        order.setGatewayRef(paymentResult.gatewayRef());
         order = orderRepository.save(order);
 
         log.info("Created order: code={}, amount={}, vendor={}", orderCode, request.getAmount(), vendor.getBusinessName());
@@ -226,9 +224,8 @@ public class OrderService {
     private String generateOrderCode() {
         String chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
         StringBuilder code = new StringBuilder();
-        Random random = new Random();
         for (int i = 0; i < ORDER_CODE_LENGTH; i++) {
-            code.append(chars.charAt(random.nextInt(chars.length())));
+            code.append(chars.charAt(RANDOM.nextInt(chars.length())));
         }
         return code.toString();
     }
@@ -237,23 +234,34 @@ public class OrderService {
      * Generate token (1 letter + 2-3 digits, skip confusing chars like O/0 and I/1)
      * Unique per vendor among ACTIVE orders
      */
-    private String generateToken(Long vendorId) {
-        String letters = "ABCDEFGHJKLMNPQRSTUVWXYZ"; // Skip I, O
-        String digits = "23456789"; // Skip 0, 1
-        Random random = new Random();
-        
-        // 1 letter
-        char letter = letters.charAt(random.nextInt(letters.length()));
-        
-        // 2-3 digits
-        int numDigits = 2 + random.nextInt(2); // 2 or 3 digits
-        StringBuilder token = new StringBuilder();
-        token.append(letter);
-        for (int i = 0; i < numDigits; i++) {
-            token.append(digits.charAt(random.nextInt(digits.length())));
+    String allocateActiveToken(Long vendorId) {
+        String token = findAvailableToken(vendorId, 2);
+        if (token != null) return token;
+        token = findAvailableToken(vendorId, 3);
+        if (token != null) return token;
+        throw new IllegalStateException("Active order token capacity exhausted for vendor");
+    }
+
+    private String findAvailableToken(Long vendorId, int digitsCount) {
+        List<String> candidates = new ArrayList<>();
+        int combinations = (int) Math.pow(TOKEN_DIGITS.length(), digitsCount);
+        for (char letter : TOKEN_LETTERS.toCharArray()) {
+            for (int value = 0; value < combinations; value++) {
+                int remaining = value;
+                StringBuilder candidate = new StringBuilder().append(letter);
+                for (int position = 0; position < digitsCount; position++) {
+                    candidate.append(TOKEN_DIGITS.charAt(remaining % TOKEN_DIGITS.length()));
+                    remaining /= TOKEN_DIGITS.length();
+                }
+                candidates.add(candidate.toString());
+            }
         }
-        
-        return token.toString();
+        Collections.shuffle(candidates, RANDOM);
+        for (String candidate : candidates) {
+            if (orderRepository.findByVendorIdAndTokenAndStatus(
+                    vendorId, candidate, Order.OrderStatus.PENDING).isEmpty()) return candidate;
+        }
+        return null;
     }
 
     /**

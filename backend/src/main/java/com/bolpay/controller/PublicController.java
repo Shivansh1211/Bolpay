@@ -3,8 +3,8 @@ package com.bolpay.controller;
 import com.bolpay.entity.Vendor;
 import com.bolpay.dto.PublicVendorDto;
 import com.bolpay.repository.VendorRepository;
+import com.bolpay.service.ScanSessionService;
 import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -17,10 +17,10 @@ import java.util.Map;
 @RestController
 @RequestMapping("/api/public")
 @RequiredArgsConstructor
-@Slf4j
 public class PublicController {
 
     private final VendorRepository vendorRepository;
+    private final ScanSessionService scanSessionService;
 
     /**
      * Track scan session for a vendor
@@ -31,10 +31,11 @@ public class PublicController {
             @PathVariable String slug,
             @RequestBody Map<String, String> request) {
         String deviceId = request.get("deviceId");
-        log.info("Scan tracked for vendor: {}, device: {}", slug, deviceId);
-        
-        // In a real implementation, this would increment a scan counter
-        // For now, just acknowledge
+        try {
+            scanSessionService.recordScan(slug, deviceId);
+        } catch (IllegalArgumentException ex) {
+            return ResponseEntity.badRequest().body(Map.of("status", "rejected"));
+        }
         return ResponseEntity.ok(Map.of("status", "tracked"));
     }
 

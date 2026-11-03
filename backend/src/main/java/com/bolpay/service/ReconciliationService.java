@@ -8,6 +8,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.beans.factory.annotation.Value;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -25,18 +26,21 @@ public class ReconciliationService {
     private final OrderService orderService;
     private final PaymentGateway paymentGateway;
 
+    @Value("${order.reconcile-min-age-seconds:10}")
+    private int minimumOrderAgeSeconds;
+
     /**
      * Scheduled task to reconcile PENDING orders with payment gateway
      * Runs every 20-30 seconds as per spec
      */
-    @Scheduled(fixedRate = 25000) // 25 seconds
+    @Scheduled(fixedRateString = "${order.reconciliation-check-ms:25000}")
     @Transactional
     public void reconcilePendingOrders() {
         log.info("Starting reconciliation of pending orders");
 
         // Get PENDING orders that are older than 10 seconds (give time for webhook)
-        LocalDateTime cutoff = LocalDateTime.now().minusSeconds(10);
-        List<Order> pendingOrders = orderRepository.findByStatusAndCreatedAtAfter(
+        LocalDateTime cutoff = LocalDateTime.now().minusSeconds(minimumOrderAgeSeconds);
+        List<Order> pendingOrders = orderRepository.findByStatusAndCreatedAtBefore(
                 Order.OrderStatus.PENDING,
                 cutoff
         );
@@ -95,7 +99,7 @@ public class ReconciliationService {
      * Scheduled task to mark expired orders
      * Runs every 30 seconds
      */
-    @Scheduled(fixedRate = 30000)
+    @Scheduled(fixedRateString = "${order.expiry-check-ms:30000}")
     @Transactional
     public void markExpiredOrders() {
         orderService.markExpiredOrders();

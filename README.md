@@ -174,6 +174,8 @@ Current migrations:
 - `V3__Add_token_and_late_paid.sql`: Adds token, payment_session_id, escalate_at fields to orders, and LATE_PAID status
 - `V4__Create_incident_log.sql`: Creates incident_log table for unresolved expired orders
 - `V5__Create_research_session.sql`: Creates research_session table for data collection
+- `V6__Widen_otp_hash.sql`: Allows storage of SHA-256 OTP hashes
+- `V7__Persist_scans_and_unique_active_tokens.sql`: Persists scan sessions and enforces unique pending tokens per vendor
 
 ## Project Structure
 

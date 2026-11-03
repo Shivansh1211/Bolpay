@@ -315,7 +315,7 @@ CHECKOUT_HTML = """
             } else if (scenario === 'abandon') {
                 window.close();
             } else if (scenario === 'drop') {
-                alert('Webhook dropped - order will expire');
+                sendWebhook(scenario);
             } else {
                 sendWebhook(scenario);
             }
@@ -325,7 +325,7 @@ CHECKOUT_HTML = """
             const payload = {
                 order_id: '{{ order_id }}',
                 cf_order_id: '{{ cf_order_id }}',
-                order_status: scenarioType === 'success' ? 'PAID' : (scenarioType === 'fail' || scenarioType === 'forged' || scenarioType === 'duplicate' ? 'FAILED' : 'FAILED'),
+                order_status: scenarioType === 'success' || scenarioType === 'drop' ? 'PAID' : 'FAILED',
                 order_amount: scenarioType === 'wrong_amount' ? {{ amount * 2 }} : {{ amount }},
                 payment_time: new Date().toISOString(),
                 scenario: scenarioType
@@ -440,12 +440,10 @@ def send_webhook():
     
     order = orders[order_id]
     
-    # Handle drop scenario - don't send webhook
-    if scenario == 'drop':
-        return jsonify({'status': 'webhook dropped'})
-    
     # Update order status
     order['order_status'] = data.get('order_status')
+    if scenario == 'drop':
+        return jsonify({'status': 'webhook dropped'})
     
     # Prepare webhook payload
     webhook_payload = {

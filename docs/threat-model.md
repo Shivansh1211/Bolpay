@@ -23,6 +23,7 @@
 - Cross-vendor order lookup and WebSocket topic access.
 - Public vendor DTO disclosure of phone and UPI fields.
 - Unprotected mock administration endpoints.
+- Scan count fabrication through an unpersisted client request, and accidental reuse of the same pending vendor token.
 
 ## Known limits
 

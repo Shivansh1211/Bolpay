@@ -31,6 +31,9 @@ order:
   slow-after: ${SLOW_AFTER:60}
   expire-after: ${EXPIRE_AFTER:150}
   escalate-after: ${ESCALATE_AFTER:240}
+  reconciliation-check-ms: ${RECONCILIATION_CHECK_MS:25000}
+  reconcile-min-age-seconds: ${RECONCILE_MIN_AGE_SECONDS:10}
+  expiry-check-ms: ${EXPIRY_CHECK_MS:30000}
 vendor:
   high-value-threshold: ${HIGH_VALUE_THRESHOLD:1000}
 cors:

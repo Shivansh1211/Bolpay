@@ -95,13 +95,18 @@ try {
     Write-Host 'PASS: backend started with PAYMENT_GATEWAY=mock.'
 
     $migrationState = docker exec $dbName psql -U bolpay_smoke -d bolpay_smoke -Atc "select count(*) || ':' || bool_and(success) || ':' || max(version) from flyway_schema_history where success"
-    if ($LASTEXITCODE -ne 0 -or $migrationState.Trim() -ne '6:true:6') {
-        throw "Expected six successful migrations on the empty database; got '$($migrationState.Trim())'."
+    if ($LASTEXITCODE -ne 0 -or $migrationState.Trim() -ne '7:true:7') {
+        throw "Expected seven successful migrations on the empty database; got '$($migrationState.Trim())'."
     }
-    Write-Host 'PASS: Flyway applied V1-V6 successfully to an empty database.'
+    Write-Host 'PASS: Flyway applied V1-V7 successfully to an empty database.'
 
     $flow = New-SmokeVendorAndOrder 'http://localhost:18080'
     Write-Host "PASS: API created vendor '$($flow.Vendor.slug)' and order with a valid token and payment_session_id (values withheld)."
+    $scan = Invoke-RestMethod -Method Post -Uri "http://localhost:18080/api/public/scan/$($flow.Vendor.slug)" -ContentType 'application/json' -Body '{"deviceId":"step1-smoke-browser"}'
+    if ($scan.status -ne 'tracked') { throw 'Public scan session was not accepted.' }
+    $scanCount = docker exec $dbName psql -U bolpay_smoke -d bolpay_smoke -Atc "select count(*) from scan_sessions s join vendors v on v.id=s.vendor_id where v.slug='$($flow.Vendor.slug)'"
+    if ($LASTEXITCODE -ne 0 -or $scanCount.Trim() -ne '1') { throw 'Public scan session was not persisted.' }
+    Write-Host 'PASS: public scan session was persisted in PostgreSQL.'
     $checkout = Invoke-WebRequest -UseBasicParsing -Uri "http://localhost:5173/checkout/$($flow.Order.paymentSessionId)"
     if ($checkout.StatusCode -ne 200 -or $checkout.Content -notmatch 'Simulated money') {
         throw 'Nginx did not forward the payment session to the simulated checkout.'

@@ -8,6 +8,8 @@ import com.bolpay.repository.OrderRepository;
 import com.bolpay.repository.VendorRepository;
 import com.bolpay.service.OrderService;
 import com.bolpay.service.AuthService;
+import com.bolpay.service.ReconciliationService;
+import com.bolpay.service.ScanSessionService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -36,7 +38,10 @@ import static org.junit.jupiter.api.Assertions.*;
 /**
  * Attack suite to prove system security against various fraud scenarios
  */
-@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
+@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT, properties = {
+        "order.expire-after=5", "order.expiry-check-ms=250",
+        "order.reconciliation-check-ms=3600000", "order.reconcile-min-age-seconds=0"
+})
 @ActiveProfiles("test")
 public class AttackSuiteTest {
 
@@ -57,6 +62,12 @@ public class AttackSuiteTest {
 
     @Autowired
     private AuthService authService;
+
+    @Autowired
+    private ReconciliationService reconciliationService;
+
+    @Autowired
+    private ScanSessionService scanSessionService;
 
     @LocalServerPort
     private int serverPort;
@@ -93,20 +104,12 @@ public class AttackSuiteTest {
 
         assertEquals("PENDING", order.getStatus());
 
-        // Wait for expiry (90 seconds)
-        // In test, we'll manually expire
-        Thread.sleep(2000);
-
-        // Check status - should still be PENDING (no webhook received)
-        Order dbOrder = orderRepository.findByOrderCode(order.getOrderCode()).orElseThrow();
-        assertEquals("PENDING", dbOrder.getStatus().name());
-
-        // Manually mark as expired for test
-        dbOrder.setStatus(Order.OrderStatus.EXPIRED);
-        orderRepository.save(dbOrder);
-
-        // Verify it's expired
-        dbOrder = orderRepository.findByOrderCode(order.getOrderCode()).orElseThrow();
+        long deadline = System.currentTimeMillis() + 12000;
+        Order dbOrder;
+        do {
+            Thread.sleep(100);
+            dbOrder = orderRepository.findByOrderCode(order.getOrderCode()).orElseThrow();
+        } while (!"EXPIRED".equals(dbOrder.getStatus().name()) && System.currentTimeMillis() < deadline);
         assertEquals("EXPIRED", dbOrder.getStatus().name());
 
         System.out.println("✓ Attack 1 PASSED: Fake modded-app screen correctly expires without webhook");
@@ -374,17 +377,16 @@ public class AttackSuiteTest {
 
         OrderDto order = orderService.createOrder(request, "test-device");
 
-        // Simulate payment via mock gateway (without webhook)
-        // In real scenario, gateway would have payment but webhook lost
-        // For test, we'll simulate the reconciliation check
-        
-        // Order should be PENDING
+        // Pay using the mock gateway's drop-webhook option: gateway state becomes PAID,
+        // while BolPay receives no webhook.
+        Map<String, Object> dropped = restTemplate.postForObject("http://mock-cashfree:9000/webhook/send",
+                Map.of("order_id", order.getOrderCode(), "scenario", "drop", "order_status", "PAID",
+                        "order_amount", order.getAmount()), Map.class);
+        assertEquals("webhook dropped", dropped.get("status"));
         Order dbOrder = orderRepository.findByOrderCode(order.getOrderCode()).orElseThrow();
         assertEquals("PENDING", dbOrder.getStatus().name());
 
-        // Run reconciliation (in real scenario, scheduled job does this)
-        // For test, we'll manually mark as paid to simulate successful reconciliation
-        orderService.markOrderAsPaid(order.getOrderCode(), "test_ref");
+        reconciliationService.reconcilePendingOrders();
 
         // Order should now be PAID
         dbOrder = orderRepository.findByOrderCode(order.getOrderCode()).orElseThrow();
@@ -392,6 +394,36 @@ public class AttackSuiteTest {
         assertNotNull(dbOrder.getPaidAt());
 
         System.out.println("✓ Attack 7 PASSED: Lost webhook scenario handled by reconciliation");
+    }
+
+    @Test
+    void scanSessionsArePersistedAndCountedForVendorBoard() {
+        ResponseEntity<Map> response = restTemplate.postForEntity("/api/public/scan/" + testVendor.getSlug(),
+                Map.of("deviceId", "browser-test-device"), Map.class);
+        assertEquals(200, response.getStatusCode().value());
+        assertEquals(1, scanSessionService.countRecentScans(testVendor.getId(), LocalDateTime.now().minusMinutes(10)));
+    }
+
+    @Test
+    void concurrentOrderCreationAllocatesDistinctActiveTokens() throws Exception {
+        var pool = java.util.concurrent.Executors.newFixedThreadPool(8);
+        try {
+            var futures = new java.util.ArrayList<java.util.concurrent.Future<OrderDto>>();
+            for (int i = 0; i < 8; i++) {
+                futures.add(pool.submit(() -> {
+                    CreateOrderRequest request = new CreateOrderRequest();
+                    request.setVendorSlug(testVendor.getSlug());
+                    request.setAmount(new BigDecimal("10"));
+                    return orderService.createOrder(request, "parallel-test");
+                }));
+            }
+            var tokens = new java.util.HashSet<String>();
+            for (var future : futures) tokens.add(future.get(30, java.util.concurrent.TimeUnit.SECONDS).getToken());
+            assertEquals(8, tokens.size());
+            assertTrue(tokens.stream().allMatch(t -> t.matches("[A-HJ-NP-Z][2-9]{2}")));
+        } finally {
+            pool.shutdownNow();
+        }
     }
 
     private ResponseEntity<Map> postWebhook(Map<String, Object> body, String overrideSignature) {
