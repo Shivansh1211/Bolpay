@@ -5,7 +5,9 @@ let stompClient = null;
 let subscriptions = [];
 
 export const connectWebSocket = (onMessageCallback, vendorId, token) => {
-  const socket = new SockJS('http://localhost:8080/ws');
+  const configuredUrl = import.meta.env.VITE_WS_URL;
+  const socketUrl = configuredUrl || `${window.location.protocol}//${window.location.host}/ws`;
+  const socket = new SockJS(socketUrl);
   stompClient = Stomp.over(socket);
   stompClient.reconnect_delay = 3000;
 

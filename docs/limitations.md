@@ -8,3 +8,4 @@
 - No hosting provider has been chosen; no deployment has occurred.
 - UI redesign is pending the required review of `docs/design-plan.md`.
 - The prototype is not a guarantee against fraud and is not represented as production-ready.
+- Frontend `npm install` reported 15 audit findings (14 moderate, 1 high) during production image builds. The dependency-level advisories have not yet been triaged or resolved.

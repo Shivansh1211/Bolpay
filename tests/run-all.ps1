@@ -10,6 +10,31 @@ Write-Host '== Docker Compose configuration =='
 Invoke-Checked 'docker' @('compose', 'config', '--quiet')
 Write-Host 'PASS: docker compose config'
 
+Write-Host '== Production Compose template configuration =='
+$validationEnvFile = Join-Path ([System.IO.Path]::GetTempPath()) "bolpay-validation-$([guid]::NewGuid().ToString('N')).env"
+$validationEnvContent = @'
+POSTGRES_DB=bolpay_validation
+POSTGRES_USER=bolpay_validation
+POSTGRES_PASSWORD=validation-only-placeholder-not-a-credential
+JWT_SECRET=validation-only-placeholder-secret-0123456789012345678901234567890123456789
+PAYMENT_GATEWAY=cashfree
+CASHFREE_BASE_URL=https://example.invalid/gateway
+CASHFREE_CLIENT_ID=validation-only-client-id
+CASHFREE_CLIENT_SECRET=validation-only-client-secret
+CASHFREE_WEBHOOK_SECRET=validation-only-webhook-secret
+PUBLIC_BASE_URL=https://example.invalid
+CORS_ALLOWED_ORIGINS=https://example.invalid
+'@
+Set-Content -LiteralPath $validationEnvFile -Value $validationEnvContent -Encoding Ascii
+try {
+    Invoke-Checked 'docker' @('compose', '--env-file', $validationEnvFile, '-f', 'docker-compose.production.yml', 'config', '--quiet')
+    Write-Host 'PASS: provider-neutral production Compose template config (dummy validation values only)'
+    Invoke-Checked 'docker' @('compose', '--env-file', $validationEnvFile, '-f', 'docker-compose.production.yml', 'build', 'frontend')
+    Write-Host 'PASS: production frontend/Nginx image build'
+} finally {
+    Remove-Item -LiteralPath $validationEnvFile -Force -ErrorAction SilentlyContinue
+}
+
 Write-Host '== Build and start services =='
 $previousOtpFlag = $env:OTP_RETURN_TO_CLIENT
 $env:OTP_RETURN_TO_CLIENT = 'true'

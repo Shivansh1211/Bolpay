@@ -91,7 +91,7 @@ Configurable timers (via environment variables):
 
 ## Project status
 
-This repository is a prototype under active verification. See [docs/PROGRESS.md](docs/PROGRESS.md), [docs/limitations.md](docs/limitations.md), and [docs/attack-results.md](docs/attack-results.md) for verified status and gaps.
+This repository is a prototype under active verification. See [docs/PROGRESS.md](docs/PROGRESS.md), [docs/limitations.md](docs/limitations.md), [docs/attack-results.md](docs/attack-results.md), and [docs/deployment-prep.md](docs/deployment-prep.md) for verified status, deployment preparation, and gaps.
 
 ## Setup Instructions
 

@@ -14,3 +14,8 @@
 - Replaced the fake-screen test's manual expiry with the scheduled expiry path and replaced manual lost-webhook state changes with the mock drop/reconcile flow.
 - Added concurrency and token fallback tests; the Docker smoke flow now verifies V1-V7 and a persisted scan session.
 - Added a vendor voice toggle and English/Hindi selection; confirmed PAID events announce the amount and token, while LATE_PAID/FLAGGED events announce an exception after voice is enabled.
+- Added a provider-neutral production Compose file that keeps PostgreSQL/backend private, omits mock gateway routes, requires runtime secrets, and binds the frontend to loopback.
+- Added production Nginx API/WebSocket proxying and same-origin frontend API/WebSocket URL defaults, plus a deployment checklist for TLS, backups, proxy trust, gateway setup, and missing SMS delivery.
+- Extended the full runner to validate production Compose with dummy values and build the production frontend/Nginx image.
+- Fixed production frontend build-argument scoping so the production Nginx config is copied into the Nginx image.
+- Isolated production Compose checks to a temporary dummy env file so they do not resolve the user's local `.env` values.
