@@ -7,8 +7,10 @@ ALTER TABLE orders ADD COLUMN payment_session_id VARCHAR(100);
 -- Add escalate_at timestamp for incident log
 ALTER TABLE orders ADD COLUMN escalate_at TIMESTAMP;
 
--- Update order_status enum to include LATE_PAID
-ALTER TYPE order_status ADD VALUE 'LATE_PAID' AFTER 'FLAGGED';
+-- V1 defines status as VARCHAR plus a CHECK constraint, not a PostgreSQL enum.
+ALTER TABLE orders DROP CONSTRAINT IF EXISTS orders_status_check;
+ALTER TABLE orders ADD CONSTRAINT orders_status_check
+    CHECK (status IN ('PENDING', 'PAID', 'EXPIRED', 'FLAGGED', 'LATE_PAID'));
 
 -- Create index on token for quick lookups
 CREATE INDEX idx_orders_token ON orders(token);

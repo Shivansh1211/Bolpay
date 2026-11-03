@@ -38,7 +38,7 @@ public interface PaymentGateway {
      */
     record PaymentResult(
         String gatewayRef,
-        String upiIntentLink,
+        String paymentSessionId,
         boolean success,
         String errorMessage
     ) {}

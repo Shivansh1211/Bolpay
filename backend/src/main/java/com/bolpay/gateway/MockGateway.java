@@ -2,6 +2,10 @@ package com.bolpay.gateway;
 
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.*;
+import org.springframework.web.client.RestTemplate;
 
 import java.math.BigDecimal;
 import java.util.HashMap;
@@ -14,28 +18,38 @@ import java.util.concurrent.ConcurrentHashMap;
  * Simulates payment flow without real money
  */
 @Component
+@ConditionalOnProperty(name = "payment.gateway", havingValue = "mock", matchIfMissing = true)
 @Slf4j
 public class MockGateway implements PaymentGateway {
+
+    @Value("${cashfree.internal-url}") private String gatewayUrl;
+    @Value("${cashfree.client-id}") private String clientId;
+    @Value("${cashfree.client-secret}") private String clientSecret;
+    private final RestTemplate restTemplate = new RestTemplate();
 
     private final Map<String, Boolean> simulatedPayments = new ConcurrentHashMap<>();
 
     @Override
     public PaymentResult createPayment(String orderCode, BigDecimal amount, String upiId, String customerPhone) {
-        String gatewayRef = "MOCK_" + UUID.randomUUID().toString().substring(0, 8);
-        
-        // Create a mock UPI intent link (in reality, this would open a UPI app)
-        String upiIntentLink = String.format(
-            "upi://pay?pa=%s&pn=BolPay&am=%s&tr=%s&tn=Payment for %s",
-            upiId,
-            amount,
-            orderCode,
-            orderCode
-        );
-
-        log.info("MockGateway: Created payment orderCode={}, amount={}, gatewayRef={}", 
-                orderCode, amount, gatewayRef);
-
-        return new PaymentResult(gatewayRef, upiIntentLink, true, null);
+        try {
+            HttpHeaders headers = new HttpHeaders();
+            headers.setContentType(MediaType.APPLICATION_JSON);
+            headers.set("x-client-id", clientId);
+            headers.set("x-client-secret", clientSecret);
+            headers.set("x-api-version", "2025-01-01");
+            Map<String, Object> body = Map.of("order_id", orderCode, "order_amount", amount,
+                    "order_currency", "INR", "order_meta", Map.of("return_url", ""));
+            ResponseEntity<Map> response = restTemplate.postForEntity(gatewayUrl + "/pg/orders",
+                    new HttpEntity<>(body, headers), Map.class);
+            Map result = response.getBody();
+            if (result == null || result.get("payment_session_id") == null)
+                return new PaymentResult(null, null, false, "Mock gateway returned no payment session");
+            return new PaymentResult((String) result.get("cf_order_id"),
+                    (String) result.get("payment_session_id"), true, null);
+        } catch (Exception e) {
+            log.error("Mock gateway order creation failed", e);
+            return new PaymentResult(null, null, false, "Mock gateway unavailable");
+        }
     }
 
     @Override

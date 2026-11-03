@@ -4,6 +4,7 @@ import com.bolpay.entity.IncidentLog;
 import com.bolpay.entity.IncidentLog.IncidentType;
 import com.bolpay.entity.Order;
 import com.bolpay.repository.IncidentLogRepository;
+import com.bolpay.repository.OrderRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;

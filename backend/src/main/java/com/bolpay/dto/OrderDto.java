@@ -30,5 +30,4 @@ public class OrderDto {
     private LocalDateTime expiresAt;
     private LocalDateTime escalateAt;
     private LocalDateTime paidAt;
-    private String upiIntentLink;
 }

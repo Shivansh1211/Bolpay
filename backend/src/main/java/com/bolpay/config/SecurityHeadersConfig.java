@@ -12,6 +12,7 @@ import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
+import java.util.List;
 
 /**
  * Configuration for security headers
@@ -21,7 +22,7 @@ public class SecurityHeadersConfig {
 
     @Bean
     public HeaderWriterFilter securityHeadersFilter() {
-        return new HeaderWriterFilter((request, response) -> {
+        return new HeaderWriterFilter(List.of((request, response) -> {
             // Content Security Policy
             response.setHeader("Content-Security-Policy",
                 "default-src 'self'; " +
@@ -55,6 +56,6 @@ public class SecurityHeadersConfig {
             
             // HSTS (only in production with HTTPS)
             // response.setHeader("Strict-Transport-Security", "max-age=31536000; includeSubDomains");
-        });
+        }));
     }
 }

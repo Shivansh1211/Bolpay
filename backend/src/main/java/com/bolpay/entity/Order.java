@@ -58,6 +58,9 @@ public class Order {
     @Column(name = "expires_at", nullable = false)
     private LocalDateTime expiresAt;
 
+    @Column(name = "escalate_at")
+    private LocalDateTime escalateAt;
+
     @Column(name = "paid_at")
     private LocalDateTime paidAt;
 

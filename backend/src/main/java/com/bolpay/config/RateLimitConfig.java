@@ -2,7 +2,6 @@ package com.bolpay.config;
 
 import io.github.bucket4j.Bandwidth;
 import io.github.bucket4j.Bucket;
-import io.github.bucket4j.Bucket4j;
 import io.github.bucket4j.Refill;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -33,7 +32,7 @@ public class RateLimitConfig implements HandlerInterceptor {
     private Bucket resolveBucket(String key, int limit, Duration duration) {
         return ipBuckets.computeIfAbsent(key, k -> {
             Bandwidth limitBandwidth = Bandwidth.classic(limit, Refill.greedy(limit, duration));
-            return Bucket4j.builder().addLimit(limitBandwidth).build();
+            return Bucket.builder().addLimit(limitBandwidth).build();
         });
     }
 

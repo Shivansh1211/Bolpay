@@ -10,6 +10,7 @@ import com.bolpay.repository.VendorRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -96,14 +97,13 @@ public class OrderService {
                 .amount(request.getAmount())
                 .orderCode(orderCode)
                 .token(token)
-                .paymentSessionId(paymentResult.upiIntentLink()) // payment_session_id from gateway
+                .paymentSessionId(paymentResult.paymentSessionId())
                 .gatewayRef(paymentResult.gatewayRef())
                 .createdAt(now)
                 .expiresAt(now.plusSeconds(expireAfterSeconds))
                 .escalateAt(now.plusSeconds(escalateAfterSeconds))
                 .deviceFingerprintHash(deviceFingerprintHash)
                 .payerHash(payerHash)
-                .upiIntentLink(paymentResult.upiIntentLink())
                 .build();
 
         order = orderRepository.save(order);
@@ -292,7 +292,6 @@ public class OrderService {
                 .expiresAt(order.getExpiresAt())
                 .escalateAt(order.getEscalateAt())
                 .paidAt(order.getPaidAt())
-                .upiIntentLink(order.getUpiIntentLink())
                 .build();
     }
 }

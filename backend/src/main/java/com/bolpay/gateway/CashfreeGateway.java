@@ -4,8 +4,10 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Component;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.web.client.RestTemplate;
 
 import javax.crypto.Mac;
@@ -23,14 +25,15 @@ import java.util.Map;
  * Switch between mock and real sandbox via CASHFREE_BASE_URL environment variable
  */
 @Component
+@ConditionalOnProperty(name = "payment.gateway", havingValue = "cashfree")
 @Slf4j
 public class CashfreeGateway implements PaymentGateway {
 
     @Value("${cashfree.base-url}")
     private String baseUrl;
 
-    @Value("${cashfree.public-url}")
-    private String publicUrl;
+    @Value("${public.base-url:http://localhost:5173}")
+    private String publicBaseUrl;
 
     @Value("${cashfree.client-id}")
     private String clientId;
@@ -136,7 +139,7 @@ public class CashfreeGateway implements PaymentGateway {
             headers.set("x-api-version", apiVersion);
 
             HttpEntity<Void> request = new HttpEntity<>(headers);
-            Map<String, Object> response = restTemplate.getForObject(url, request, Map.class);
+            Map<String, Object> response = restTemplate.exchange(url, HttpMethod.GET, request, Map.class).getBody();
             
             if (response != null) {
                 String orderStatus = (String) response.get("order_status");
