@@ -7,6 +7,9 @@
 *.war
 *.ear
 target/
+**/target/
+volumes/
+postgres_data/
 .mvn/
 mvnw
 mvnw.cmd
@@ -24,6 +27,7 @@ ml-service/models/*.pkl
 
 # Node
 node_modules/
+**/node_modules/
 dist/
 *.local
 npm-debug.log*

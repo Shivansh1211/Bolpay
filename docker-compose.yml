@@ -1,0 +1,82 @@
+services:
+  postgres:
+    image: postgres:15-alpine
+    container_name: bolpay-postgres
+    environment:
+      POSTGRES_DB: bolpay
+      POSTGRES_USER: bolpay_user
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-bolpay_mock_dev_password}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U bolpay_user -d bolpay"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks: [internal]
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: bolpay-backend
+    ports:
+      - "8080:8080"
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/bolpay
+      SPRING_DATASOURCE_USERNAME: bolpay_user
+      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-bolpay_mock_dev_password}
+      SPRING_PROFILES_ACTIVE: dev
+      JWT_SECRET: ${JWT_SECRET:-bolpay-local-only-jwt-secret-change-before-deploy-64chars}
+      PAYMENT_GATEWAY: ${PAYMENT_GATEWAY:-mock}
+      CASHFREE_BASE_URL: ${CASHFREE_BASE_URL:-http://mock-cashfree:9000}
+      CASHFREE_CLIENT_ID: ${CASHFREE_CLIENT_ID:-bolpay-mock-client}
+      CASHFREE_CLIENT_SECRET: ${CASHFREE_CLIENT_SECRET:-bolpay-mock-client-secret}
+      CASHFREE_WEBHOOK_SECRET: ${CASHFREE_WEBHOOK_SECRET:-bolpay-mock-webhook-secret}
+      PUBLIC_BASE_URL: ${PUBLIC_BASE_URL:-http://localhost:5173}
+      ML_SERVICE_URL: http://ml-service:5000
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks: [internal]
+
+  ml-service:
+    build:
+      context: ./ml-service
+      dockerfile: Dockerfile
+    container_name: bolpay-ml-service
+    # Internal network only - not exposed publicly
+    environment:
+      FLASK_ENV: development
+    volumes:
+      - ./ml-service:/app
+    networks: [internal]
+
+  mock-cashfree:
+    build:
+      context: ./mock-cashfree
+      dockerfile: Dockerfile
+    container_name: bolpay-mock-cashfree
+    environment:
+      CASHFREE_CLIENT_ID: ${CASHFREE_CLIENT_ID:-bolpay-mock-client}
+      CASHFREE_CLIENT_SECRET: ${CASHFREE_CLIENT_SECRET:-bolpay-mock-client-secret}
+      CASHFREE_WEBHOOK_SECRET: ${CASHFREE_WEBHOOK_SECRET:-bolpay-mock-webhook-secret}
+    networks: [internal]
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        VITE_PUBLIC_BASE_URL: ${PUBLIC_BASE_URL:-http://localhost:5173}
+    container_name: bolpay-frontend
+    ports:
+      - "5173:80"
+    networks: [internal]
+
+volumes:
+  postgres_data:
+
+networks:
+  internal:
+    driver: bridge

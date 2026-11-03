@@ -121,7 +121,7 @@ const VendorPage = () => {
     if (order?.paymentSessionId) {
       // Use public URL for checkout (must be reachable from phone)
       const publicBaseUrl = import.meta.env.VITE_PUBLIC_BASE_URL || window.location.origin;
-      const mockCheckoutUrl = publicBaseUrl.replace(/:\d+/, ':9000') + `/checkout/${order.paymentSessionId}`;
+      const mockCheckoutUrl = `${publicBaseUrl}/checkout/${order.paymentSessionId}`;
       window.open(mockCheckoutUrl, '_blank');
     }
   };

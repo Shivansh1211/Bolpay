@@ -2,6 +2,9 @@ FROM node:20-alpine AS build
 
 WORKDIR /app
 
+ARG VITE_PUBLIC_BASE_URL=http://localhost:5173
+ENV VITE_PUBLIC_BASE_URL=$VITE_PUBLIC_BASE_URL
+
 COPY package.json package-lock.json* ./
 RUN npm install
 
