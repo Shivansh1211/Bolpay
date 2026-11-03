@@ -75,6 +75,7 @@ const VendorDashboard = () => {
   const [quickCheckToken, setQuickCheckToken] = useState('');
   const [quickCheckResult, setQuickCheckResult] = useState(null);
   const [language, setLanguage] = useState('en'); // 'en' or 'hi'
+  const [voiceEnabled, setVoiceEnabled] = useState(() => localStorage.getItem('voiceAnnouncements') === 'true');
   const [glanceMode, setGlanceMode] = useState(false);
   const [scanCount, setScanCount] = useState(0);
 
@@ -104,25 +105,29 @@ const VendorDashboard = () => {
       connectWebSocket((orderData) => {
         console.log('Payment received:', orderData);
         
-        // Only show alert for exceptions (late payment, etc.)
-        if (orderData.status === 'LATE_PAID' || orderData.status === 'FLAGGED') {
+        const isException = orderData.status === 'LATE_PAID' || orderData.status === 'FLAGGED';
+        if (isException) {
           setRecentPayment(orderData);
           setShowPaymentAlert(true);
-          
-          // Play sound only for exceptions
-          if ('speechSynthesis' in window) {
-            const utterance = new SpeechSynthesisUtterance(
-              language === 'hi' 
-                ? `असामान्य भुगतान: ${orderData.amount} रुपये`
-                : `Unusual payment: ${orderData.amount} rupees`
-            );
-            utterance.lang = language === 'hi' ? 'hi-IN' : 'en-IN';
-            window.speechSynthesis.speak(utterance);
-          }
-          
-          // Vibrate for exceptions
           if ('vibrate' in navigator) {
             navigator.vibrate([200, 100, 200]);
+          }
+        }
+
+        if (voiceEnabled && 'speechSynthesis' in window && window.speechSynthesis) {
+          const message = isException
+            ? (language === 'hi'
+              ? `असामान्य भुगतान: ${orderData.amount} रुपये`
+              : `Unusual payment: ${orderData.amount} rupees`)
+            : (orderData.status === 'PAID'
+              ? (language === 'hi'
+                ? `${orderData.amount} रुपये का भुगतान मिल गया। टोकन ${orderData.token}`
+                : `Payment received: ${orderData.amount} rupees. Token ${orderData.token}`)
+              : null);
+          if (message) {
+            const utterance = new SpeechSynthesisUtterance(message);
+            utterance.lang = language === 'hi' ? 'hi-IN' : 'en-IN';
+            window.speechSynthesis.speak(utterance);
           }
         }
         
@@ -139,7 +144,19 @@ const VendorDashboard = () => {
     return () => {
       disconnectWebSocket();
     };
-  }, [user?.id]);
+  }, [user?.id, language, voiceEnabled]);
+
+  const toggleVoiceAnnouncements = () => {
+    const nextEnabled = !voiceEnabled;
+    setVoiceEnabled(nextEnabled);
+    localStorage.setItem('voiceAnnouncements', String(nextEnabled));
+    if (nextEnabled && 'speechSynthesis' in window && window.speechSynthesis) {
+      window.speechSynthesis.cancel();
+      const prompt = new SpeechSynthesisUtterance(language === 'hi' ? 'आवाज़ चालू है' : 'Voice announcements enabled');
+      prompt.lang = language === 'hi' ? 'hi-IN' : 'en-IN';
+      window.speechSynthesis.speak(prompt);
+    }
+  };
 
   const handleLogout = () => {
     logout();
@@ -193,13 +210,23 @@ const VendorDashboard = () => {
               <p className="text-white/80 text-small">Vendor board</p>
             </div>
           </div>
-          <Button
-            variant="secondary"
-            size="sm"
-            onClick={handleLogout}
-          >
-            Logout
-          </Button>
+          <div className="flex items-center gap-2">
+            <label className="sr-only" htmlFor="voice-language">Announcement language</label>
+            <select
+              id="voice-language"
+              aria-label="Announcement language"
+              value={language}
+              onChange={(event) => setLanguage(event.target.value)}
+              className="rounded-sm px-2 py-2 text-sm text-text-primary"
+            >
+              <option value="en">English</option>
+              <option value="hi">हिन्दी</option>
+            </select>
+            <Button variant="secondary" size="sm" onClick={toggleVoiceAnnouncements} aria-pressed={voiceEnabled}>
+              Voice {voiceEnabled ? 'On' : 'Off'}
+            </Button>
+            <Button variant="secondary" size="sm" onClick={handleLogout}>Logout</Button>
+          </div>
         </div>
       </div>
 

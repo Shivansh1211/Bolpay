@@ -13,3 +13,4 @@
 - Updated the mock gateway's drop-webhook flow to retain paid gateway state; mock status lookup now lets reconciliation recover the paid order.
 - Replaced the fake-screen test's manual expiry with the scheduled expiry path and replaced manual lost-webhook state changes with the mock drop/reconcile flow.
 - Added concurrency and token fallback tests; the Docker smoke flow now verifies V1-V7 and a persisted scan session.
+- Added a vendor voice toggle and English/Hindi selection; confirmed PAID events announce the amount and token, while LATE_PAID/FLAGGED events announce an exception after voice is enabled.
