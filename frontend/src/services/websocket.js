@@ -1,5 +1,7 @@
 import SockJS from 'sockjs-client';
-import Stomp from 'stompjs';
+import StompModule from 'stompjs/lib/stomp.js';
+
+const Stomp = StompModule.Stomp;
 
 let stompClient = null;
 let subscriptions = [];

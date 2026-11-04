@@ -37,9 +37,21 @@ try {
 
 Write-Host '== Build and start services =='
 $previousOtpFlag = $env:OTP_RETURN_TO_CLIENT
+$previousExpiryAfter = $env:EXPIRE_AFTER
+$previousExpiryCheck = $env:EXPIRY_CHECK_MS
+$previousCorsOrigins = $env:CORS_ALLOWED_ORIGINS
 $env:OTP_RETURN_TO_CLIENT = 'true'
-Invoke-Checked 'docker' @('compose', 'up', '--build', '-d')
-$env:OTP_RETURN_TO_CLIENT = $previousOtpFlag
+$env:EXPIRE_AFTER = '5'
+$env:EXPIRY_CHECK_MS = '250'
+$env:CORS_ALLOWED_ORIGINS = 'http://localhost:5173,http://frontend'
+try {
+    Invoke-Checked 'docker' @('compose', 'up', '--build', '-d')
+} finally {
+    $env:OTP_RETURN_TO_CLIENT = $previousOtpFlag
+    $env:EXPIRE_AFTER = $previousExpiryAfter
+    $env:EXPIRY_CHECK_MS = $previousExpiryCheck
+    $env:CORS_ALLOWED_ORIGINS = $previousCorsOrigins
+}
 
 Write-Host '== Backend tests using disposable PostgreSQL =='
 $dbName = 'bolpay-run-all-db'
@@ -60,5 +72,14 @@ try {
 Write-Host '== Docker/API smoke tests =='
 & "$PSScriptRoot/step1-smoke.ps1"
 if ($LASTEXITCODE -ne 0) { throw 'Step 1 smoke tests failed.' }
+
+Write-Host '== Playwright browser and webhook-to-board tests =='
+$playwrightImage = 'bolpay-e2e:local'
+$artifactDirectory = Join-Path $PSScriptRoot 'artifacts'
+New-Item -ItemType Directory -Path $artifactDirectory -Force | Out-Null
+$artifactMount = (Resolve-Path $artifactDirectory).Path.Replace('\', '/')
+Invoke-Checked 'docker' @('build', '-f', 'tests/e2e/Dockerfile', '-t', $playwrightImage, 'tests/e2e')
+Invoke-Checked 'docker' @('run', '--rm', '--network', 'bolpay_internal', '-e', 'API_URL=http://backend:8080', '-e', 'MOCK_URL=http://mock-cashfree:9000', '-e', 'FRONTEND_URL=http://frontend', '-e', 'PLAYWRIGHT_SCREENSHOT_DIR=/results', '-e', 'PLAYWRIGHT_METRICS_PATH=/results/latency.json', '-v', "${artifactMount}:/results", $playwrightImage)
+Write-Host 'PASS: Playwright customer flow, vendor live board, voice announcement, screenshots, and webhook latency samples'
 
 Write-Host 'ALL TESTS PASSED.'

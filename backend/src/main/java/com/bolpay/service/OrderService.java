@@ -193,6 +193,7 @@ public class OrderService {
         for (Order order : expiredOrders) {
             order.setStatus(Order.OrderStatus.EXPIRED);
             orderRepository.save(order);
+            notifyVendorAfterCommit(order);
             log.info("Marked order {} as EXPIRED", order.getOrderCode());
         }
     }

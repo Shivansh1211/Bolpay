@@ -32,6 +32,9 @@ dist/
 *.local
 npm-debug.log*
 
+# Raw Playwright, protocol, and log captures (review selected screenshots before commit)
+tests/artifacts/
+
 # IDE
 .idea/
 .vscode/

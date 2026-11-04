@@ -69,7 +69,13 @@ const OrderRow = ({ order, type }) => {
 const VendorDashboard = () => {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
-  const [boardData, setBoardData] = useState(null);
+  const [boardData, setBoardData] = useState({
+    payingNow: 0,
+    paidLast10Min: 0,
+    waitingOrders: [],
+    paidOrders: [],
+    allOrders: [],
+  });
   const [recentPayment, setRecentPayment] = useState(null);
   const [showPaymentAlert, setShowPaymentAlert] = useState(false);
   const [quickCheckToken, setQuickCheckToken] = useState('');
@@ -241,7 +247,7 @@ const VendorDashboard = () => {
               </div>
               <span className="text-white/80 text-small">Scanned</span>
             </div>
-            <p className="text-5xl font-bold mb-1">{scanCount}</p>
+            <p data-testid="scan-count" className="text-5xl font-bold mb-1">{scanCount}</p>
             <p className="text-white/80 text-tiny">Customers today</p>
           </Card>
 
@@ -383,8 +389,10 @@ const VendorDashboard = () => {
                 </div>
               ) : (
                 <div className="space-y-3">
-                  {boardData.waitingOrders.map((order) => (
-                    <OrderRow key={order.id} order={order} type="pending" />
+                  {(boardData?.waitingOrders || []).map((order) => (
+                    <div key={order.id} data-testid={`pending-order-${order.id}`}>
+                      <OrderRow order={order} type="pending" />
+                    </div>
                   ))}
                 </div>
               )}
@@ -407,7 +415,7 @@ const VendorDashboard = () => {
                 </div>
               ) : (
                 <div className="space-y-3">
-                  {boardData.paidOrders.map((order, index) => (
+                  {(boardData?.paidOrders || []).map((order, index) => (
                     <div key={order.id} data-testid={`paid-order-${order.id}`} className={index < 3 ? 'ring-2 ring-status-paid rounded-sm' : ''}>
                       <OrderRow order={order} type="paid" />
                     </div>
@@ -433,8 +441,10 @@ const VendorDashboard = () => {
                 </div>
               ) : (
                 <div className="space-y-3">
-                  {boardData.allOrders.map((order) => (
-                    <OrderRow key={order.id} order={order} type="all" />
+                  {(boardData?.allOrders || []).map((order) => (
+                    <div key={order.id} data-testid={`all-order-${order.id}`}>
+                      <OrderRow order={order} type="all" />
+                    </div>
                   ))}
                 </div>
               )}

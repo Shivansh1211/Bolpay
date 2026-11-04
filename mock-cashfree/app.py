@@ -390,7 +390,7 @@ def create_order():
         'order_currency': order_currency,
         'order_expiry_time': order_expiry_time,
         'order_meta': data.get('order_meta', {}),
-        'return_url': data.get('return_url', '')
+        'return_url': data.get('return_url') or data.get('order_meta', {}).get('return_url', '')
     }
     
     return jsonify({
