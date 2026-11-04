@@ -9,7 +9,7 @@ Result: **PASS** (exit code 0).
 - API and Compose smoke tests passed, including Flyway V1–V7 on disposable databases, scan persistence, mock checkout routing, and admin/attack route 404s.
 - Chromium Playwright: **1 passed**. Flow: scan → Scanned counter → amount/token → amber pending row → pay in mock → green row updated live without refresh → customer Payment verified → abandon without webhook → real scheduled expiry turns row red. Voice announcement passed.
 - Browser STOMP observed CONNECTED and MESSAGE frames during the live flow, with no ERROR frame.
-- Webhook-received timestamp to paid board DOM update: **20 samples; p95 116 ms** (`tests/artifacts/latency.json`, ignored).
+- Webhook-received timestamp to paid board DOM update: **20 samples; p95 90 ms** (`tests/artifacts/latency.json`, ignored).
 
 ## Reviewed screenshots
 
@@ -23,7 +23,7 @@ Result: **PASS** (exit code 0).
 - [Customer verified](/C:/Users/shiva/CascadeProjects/bolpay/docs/test-evidence/09-customer-verified.png)
 - [Red expired row](/C:/Users/shiva/CascadeProjects/bolpay/docs/test-evidence/10-vendor-abandoned-red.png)
 
-The checkout screenshot containing a visible order reference remains only in ignored raw artifacts and is not committed. The full runner transcript is kept in ignored `tests/artifacts/full-run-output.txt`; `docs/test-run-output.txt` contains a safe excerpt.
+The checkout screenshot containing a visible order reference remains only in ignored raw artifacts and is not committed. The full runner transcript is kept in ignored `tests/artifacts/post-merge-run-output.txt`; `docs/test-run-output.txt` contains a safe excerpt.
 
 ## Test boundaries
 

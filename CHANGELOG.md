@@ -32,3 +32,4 @@
 - Added real signed-JWT SockJS/STOMP integration coverage for own-topic delivery, cross-vendor denial, and missing/invalid JWT denial.
 - Published expired orders after commit so the live board turns red after scheduled expiry; Playwright now completes payment, verification, abandon, and expiry states.
 - Re-ran the complete Docker/Maven/Chromium gate successfully: 22 Maven tests passed and Playwright reported 1 passed; recorded p95 116 ms across 20 samples.
+- Merged the verified WIP branch into codex-takeover; retained the tests-pass tag.

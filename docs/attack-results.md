@@ -29,7 +29,7 @@ The interceptor reads native STOMP `Authorization: Bearer <JWT>` and names the p
 
 ## Current browser and latency proof
 
-Playwright covers scan, Scanned count, amount/token, amber pending, mock payment, live green row without refresh, customer verified state, abandon without a webhook, and live red row after real expiry. Twenty webhook-received-to-board-DOM samples measured **p95 116 ms**. Reviewed screenshots are in `docs/test-evidence/`; raw frames/logs and full output are ignored under `tests/artifacts/`.
+Playwright covers scan, Scanned count, amount/token, amber pending, mock payment, live green row without refresh, customer verified state, abandon without a webhook, and live red row after real expiry. Twenty webhook-received-to-board-DOM samples measured **p95 90 ms**. Reviewed screenshots are in `docs/test-evidence/`; raw frames/logs and full output are ignored under `tests/artifacts/`.
 
 ## Remaining limits
 

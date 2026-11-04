@@ -38,9 +38,15 @@
 
 ```powershell
 Set-Location 'C:\Users\shiva\CascadeProjects\bolpay'
-git switch codex/wip-playwright-evidence
+git switch codex-takeover
 git status --short --branch
 pwsh -NoProfile -File tests/run-all.ps1
 ```
 
-- WIP commit: cc8a96c on codex/wip-playwright-evidence; 	ests-pass tag created after the successful full run. Raw runner output and latency samples remain git-ignored.
+## Next phase: housekeeping
+
+- Merged `codex/wip-playwright-evidence` into `codex-takeover` with merge commit `4e5546a`; the `tests-pass` tag still points to the verified WIP snapshot.
+- Post-merge `tests/run-all.ps1` passed on HEAD `4e5546a`: 22 Maven tests (0 failures/errors/skips), API/Compose smoke tests, and Playwright (1 passed in 21.6s). Final output: `PASS: Playwright customer flow, vendor live board, voice announcement, screenshots, and webhook latency samples` and `ALL TESTS PASSED.`; 20-sample p95 was 90 ms. Full transcript is ignored at `tests/artifacts/post-merge-run-output.txt`. The optional historical `step2-pass` rerun was interrupted before results and remains unverified.
+- The temporary historical worktree and its ignored directory were removed after the build ended.
+- Next: proceed through brand wiring, pattern research, static design preview, and deployment preparation. Do not change the live app for the static preview; stop for approval after Task 5.
+- WIP commit and `tests-pass` tag were created after a successful full run. Raw runner output and latency samples remain Git-ignored.
