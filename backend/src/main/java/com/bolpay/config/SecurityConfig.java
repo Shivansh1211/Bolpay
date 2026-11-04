@@ -47,6 +47,8 @@ public class SecurityConfig {
                         // Order creation and status (public for customers)
                         .requestMatchers("/api/orders/create").permitAll()
                         .requestMatchers("/api/orders/*/status").permitAll()
+                        // SockJS transport is public; the STOMP CONNECT interceptor requires vendor JWT auth.
+                        .requestMatchers("/ws/**").permitAll()
                         // Quick check now requires vendor JWT (security fix)
                         .requestMatchers("/api/orders/quick-check/**").authenticated()
                         // Vendor endpoints (require authentication)

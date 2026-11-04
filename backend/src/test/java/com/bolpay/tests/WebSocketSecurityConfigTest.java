@@ -16,6 +16,15 @@ import static org.mockito.Mockito.mock;
 
 class WebSocketSecurityConfigTest {
     @Test
+    void rejectsStompConnectWithoutBearerToken() {
+        AuthService authService = mock(AuthService.class);
+        WebSocketSecurityConfig interceptor = new WebSocketSecurityConfig(authService);
+        StompHeaderAccessor accessor = StompHeaderAccessor.create(StompCommand.CONNECT);
+        Message<byte[]> message = MessageBuilder.createMessage(new byte[0], accessor.getMessageHeaders());
+        assertThrows(IllegalArgumentException.class, () -> interceptor.preSend(message, mock(MessageChannel.class)));
+    }
+
+    @Test
     void rejectsSubscriptionToAnotherVendorTopic() {
         AuthService authService = mock(AuthService.class);
         WebSocketSecurityConfig interceptor = new WebSocketSecurityConfig(authService);

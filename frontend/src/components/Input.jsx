@@ -15,7 +15,7 @@ const Input = ({
   return (
     <div className="space-y-1">
       {label && (
-        <label className="block text-small font-medium text-text-primary">
+        <label htmlFor={props.id} className="block text-small font-medium text-text-primary">
           {label}
         </label>
       )}

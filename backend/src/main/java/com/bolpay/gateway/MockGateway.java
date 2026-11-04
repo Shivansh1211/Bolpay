@@ -30,6 +30,7 @@ public class MockGateway implements PaymentGateway {
     @Value("${cashfree.client-id}") private String clientId;
     @Value("${cashfree.client-secret}") private String clientSecret;
     @Value("${cashfree.webhook-secret}") private String webhookSecret;
+    @Value("${public.base-url:http://localhost:5173}") private String publicBaseUrl;
     private final RestTemplate restTemplate = new RestTemplate();
 
     private final Map<String, Boolean> simulatedPayments = new ConcurrentHashMap<>();
@@ -43,7 +44,7 @@ public class MockGateway implements PaymentGateway {
             headers.set("x-client-secret", clientSecret);
             headers.set("x-api-version", "2025-01-01");
             Map<String, Object> body = Map.of("order_id", orderCode, "order_amount", amount,
-                    "order_currency", "INR", "order_meta", Map.of("return_url", ""));
+                    "order_currency", "INR", "order_meta", Map.of("return_url", publicBaseUrl + "/o/" + orderCode));
             ResponseEntity<Map> response = restTemplate.postForEntity(gatewayUrl + "/pg/orders",
                     new HttpEntity<>(body, headers), Map.class);
             Map result = response.getBody();

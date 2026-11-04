@@ -123,8 +123,8 @@ public class ReconciliationService {
 
         // In a real implementation, these would be logged to an incident table
         for (Order order : ordersToEscalate) {
-            log.warn("Escalating order {} to incident log - status: {}, token: {}", 
-                order.getOrderCode(), order.getStatus(), order.getToken());
+            log.warn("Escalating order {} to incident log - status: {}",
+                order.getOrderCode(), order.getStatus());
         }
     }
 }

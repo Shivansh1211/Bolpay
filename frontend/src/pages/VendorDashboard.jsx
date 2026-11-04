@@ -69,7 +69,13 @@ const OrderRow = ({ order, type }) => {
 const VendorDashboard = () => {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
-  const [boardData, setBoardData] = useState(null);
+  const [boardData, setBoardData] = useState({
+    payingNow: 0,
+    paidLast10Min: 0,
+    waitingOrders: [],
+    paidOrders: [],
+    allOrders: [],
+  });
   const [recentPayment, setRecentPayment] = useState(null);
   const [showPaymentAlert, setShowPaymentAlert] = useState(false);
   const [quickCheckToken, setQuickCheckToken] = useState('');
@@ -103,8 +109,6 @@ const VendorDashboard = () => {
     // Connect to WebSocket for real-time updates (quiet by default)
     if (user?.id) {
       connectWebSocket((orderData) => {
-        console.log('Payment received:', orderData);
-        
         const isException = orderData.status === 'LATE_PAID' || orderData.status === 'FLAGGED';
         if (isException) {
           setRecentPayment(orderData);
@@ -243,7 +247,7 @@ const VendorDashboard = () => {
               </div>
               <span className="text-white/80 text-small">Scanned</span>
             </div>
-            <p className="text-5xl font-bold mb-1">{scanCount}</p>
+            <p data-testid="scan-count" className="text-5xl font-bold mb-1">{scanCount}</p>
             <p className="text-white/80 text-tiny">Customers today</p>
           </Card>
 
@@ -369,7 +373,7 @@ const VendorDashboard = () => {
         {!glanceMode && (
           <>
             {/* Paying Now */}
-            <Card variant="default" padding="md" shadow="md" className="mb-4">
+            <Card data-testid="recent-paid-orders" variant="default" padding="md" shadow="md" className="mb-4">
               <h2 className="text-h3 font-bold text-text-primary mb-4 flex items-center gap-2">
                 <svg className="w-5 h-5 text-status-paying" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
@@ -385,8 +389,10 @@ const VendorDashboard = () => {
                 </div>
               ) : (
                 <div className="space-y-3">
-                  {boardData.waitingOrders.map((order) => (
-                    <OrderRow key={order.id} order={order} type="pending" />
+                  {(boardData?.waitingOrders || []).map((order) => (
+                    <div key={order.id} data-testid={`pending-order-${order.id}`}>
+                      <OrderRow order={order} type="pending" />
+                    </div>
                   ))}
                 </div>
               )}
@@ -409,8 +415,8 @@ const VendorDashboard = () => {
                 </div>
               ) : (
                 <div className="space-y-3">
-                  {boardData.paidOrders.map((order, index) => (
-                    <div key={order.id} className={index < 3 ? 'ring-2 ring-status-paid rounded-sm' : ''}>
+                  {(boardData?.paidOrders || []).map((order, index) => (
+                    <div key={order.id} data-testid={`paid-order-${order.id}`} className={index < 3 ? 'ring-2 ring-status-paid rounded-sm' : ''}>
                       <OrderRow order={order} type="paid" />
                     </div>
                   ))}
@@ -435,8 +441,10 @@ const VendorDashboard = () => {
                 </div>
               ) : (
                 <div className="space-y-3">
-                  {boardData.allOrders.map((order) => (
-                    <OrderRow key={order.id} order={order} type="all" />
+                  {(boardData?.allOrders || []).map((order) => (
+                    <div key={order.id} data-testid={`all-order-${order.id}`}>
+                      <OrderRow order={order} type="all" />
+                    </div>
                   ))}
                 </div>
               )}

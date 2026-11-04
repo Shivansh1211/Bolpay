@@ -99,15 +99,16 @@ const VendorPage = () => {
 
     setCreating(true);
     try {
-      const response = await orderAPI.createOrder({
+      const response = await orderAPI.create({
         vendorSlug: slug,
         amount: parseFloat(amount)
       });
-      setOrder(response.data);
+      const createdOrder = response.data;
+      setOrder(createdOrder);
       
       // Auto-open checkout after order creation
       setTimeout(() => {
-        openCheckout();
+        openCheckout(createdOrder);
       }, 500);
     } catch (err) {
       console.error('Failed to create order:', err);
@@ -117,11 +118,11 @@ const VendorPage = () => {
     }
   };
 
-  const openCheckout = () => {
-    if (order?.paymentSessionId) {
+  const openCheckout = (checkoutOrder = order) => {
+    if (checkoutOrder?.paymentSessionId) {
       // Use public URL for checkout (must be reachable from phone)
       const publicBaseUrl = import.meta.env.VITE_PUBLIC_BASE_URL || window.location.origin;
-      const mockCheckoutUrl = `${publicBaseUrl}/checkout/${order.paymentSessionId}`;
+      const mockCheckoutUrl = `${publicBaseUrl}/checkout/${checkoutOrder.paymentSessionId}`;
       window.open(mockCheckoutUrl, '_blank');
     }
   };

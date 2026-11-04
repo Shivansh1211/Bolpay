@@ -1,0 +1,15 @@
+Chromium console/pageerror output captured while reproducing the blank vendor dashboard:
+
+BROWSER_CONSOLE_ERROR: TypeError: Cannot read properties of null (reading 'waitingOrders')
+    at qE (http://frontend/assets/index-DP9emJL0.js:80:20674)
+    at Fu (http://frontend/assets/index-DP9emJL0.js:38:16968)
+    at tm (http://frontend/assets/index-DP9emJL0.js:40:43867)
+    at Yh (http://frontend/assets/index-DP9emJL0.js:40:39648)
+    at Mv (http://frontend/assets/index-DP9emJL0.js:40:39576)
+    at di (http://frontend/assets/index-DP9emJL0.js:40:39430)
+    at Ua (http://frontend/assets/index-DP9emJL0.js:40:35817)
+    at Kh (http://frontend/assets/index-DP9emJL0.js:40:34768)
+    at N (http://frontend/assets/index-DP9emJL0.js:25:1578)
+    at MessagePort.H (http://frontend/assets/index-DP9emJL0.js:25:1944)
+
+The source-level cause was `boardData` initialized to `null` followed by direct list mapping on the first render before the board fetch completed. The initial board state now supplies empty arrays and guarded list mapping; Chromium proceeded to later scan/payment states after that change.

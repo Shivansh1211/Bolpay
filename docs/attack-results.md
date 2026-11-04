@@ -1,27 +1,36 @@
 # Attack test results
 
-## Latest verified run
+Latest command: `pwsh -NoProfile -File tests/run-all.ps1`. Result: **ALL TESTS PASSED**; Maven reported 22 tests, 0 failures, 0 errors, 0 skipped, and Chromium Playwright passed. This is local automated evidence, not production security validation.
 
-Command: `pwsh -File tests/run-all.ps1` (Docker Compose, PostgreSQL 15, Spring Boot test profile, mock payment gateway).
+## WebSocket evidence
 
-Result: **18 Maven tests passed, 0 failed, 0 errored, 0 skipped**, followed by passing API/Compose smoke checks ending in `ALL TESTS PASSED.` This is local automated evidence, not proof of production security or fraud prevention.
+Before the interceptor fix, Chromium received STOMP `ERROR` header `message:Failed to send message to ExecutorSubscribableChannel[clientInboundChannel]`. At `2026-11-04T21:44:20.300Z`, the backend logged `vendorTopic=true, numericDestination=true, principalPresent=false, destinationMatchesPrincipal=false`; Spring logged the matching inbound-channel failure at `21:44:20.301Z`. Raw captures are in the ignored `tests/artifacts/ws-error-frame.log` and `tests/artifacts/backend-websocket-cause.log`.
 
-## Coverage in the verified suite
+The interceptor reads native STOMP `Authorization: Bearer <JWT>` and names the principal from the JWT `vendorId` claim. The prior unit test fabricated a principal, so `WebSocketStompIntegrationTest` now covers a real signed JWT over SockJS/STOMP: `signedJwtCanSubscribeToOwnTopicButNotAnotherVendorsTopic` proves own-topic delivery and cross-vendor denial; `missingAndInvalidJwtAreDeniedDuringStompConnect` proves absent and invalid credentials are denied. Playwright's current live flow receives STOMP CONNECTED/MESSAGE and updates the paid row without refresh.
 
-- Invalid and missing webhook signatures are rejected; payloads missing event ID or amount are rejected.
-- Duplicate webhook event IDs are idempotent; a wrong amount does not mark the order paid.
-- Registration without OTP proof is rejected; OTP is omitted from the default response.
-- Public vendor responses omit phone and UPI values; a vendor cannot read another vendor's order by code or quick-check token.
-- A WebSocket subscription to another vendor's topic is rejected.
-- Concurrent order creation is checked for distinct active tokens; token fallback is checked after all 2-digit candidates are occupied.
-- The fake-screen test now waits for the short test expiry timer and observes the scheduled expiry job.
-- The lost-webhook test uses the mock gateway's drop option, then calls reconciliation against the gateway's retained PAID state.
-- Other suite cases exercise payment state/replay scenarios.
+## Security test mapping
 
-## Test limitations
+| Item | Exact automated proof |
+|---|---|
+| Unsigned webhook | `AttackSuiteTest.webhookWithoutSignatureIsRejected` |
+| Bad signature | `AttackSuiteTest.testForgedWebhook_BadSignature` |
+| Replayed/stale timestamp | `AttackSuiteTest.correctlySignedWebhookWithStaleTimestampIsRejected` |
+| Duplicate event | `AttackSuiteTest.testDuplicateWebhook_Idempotent` |
+| Wrong amount | `AttackSuiteTest.testWrongAmountWebhook_Rejected` |
+| Missing event ID/amount | `AttackSuiteTest.webhookMissingEventIdOrAmountIsRejected` |
+| Vendor A vs vendor B | `AttackSuiteTest.vendorCannotReadAnotherVendorsOrderByCode`; `WebSocketStompIntegrationTest.signedJwtCanSubscribeToOwnTopicButNotAnotherVendorsTopic` |
+| WebSocket cross-topic | `WebSocketStompIntegrationTest.signedJwtCanSubscribeToOwnTopicButNotAnotherVendorsTopic` |
+| Registration without OTP | `AttackSuiteTest.registrationWithoutOtpProofIsRejected` |
+| OTP absent from API/logs | `AttackSuiteTest.otpIsNotReturnedToClientByDefault` |
+| Scan sessions counted | `AttackSuiteTest.scanSessionsArePersistedAndCountedForVendorBoard` |
+| Token uniqueness | `AttackSuiteTest.concurrentOrderCreationAllocatesDistinctActiveTokens`; `OrderTokenAllocationTest` two-digit and three-digit fallback tests |
+| Fake screen, no webhook | `AttackSuiteTest.testFakeModdedAppScreen_NoWebhook` waits for scheduled expiry and asserts EXPIRED |
+| Lost webhook | `AttackSuiteTest.testLostWebhook_ReconciliationFixes` uses mock `scenario=drop`, confirms PENDING, then reconciliation marks PAID; no manual status mutation |
 
-- The duplicate test checks the final paid state but does not count emitted WebSocket announcements or exercise simultaneous duplicate deliveries.
-- This run did not include Playwright browser coverage, a sustained load test, real-phone use, or a live payment gateway.
-- Webhook signature verification uses the local mock secret. Cashfree account behavior is not validated here.
+## Current browser and latency proof
 
-Do not interpret these test results as preventing scams. See [threat-model.md](threat-model.md) and [limitations.md](limitations.md).
+Playwright covers scan, Scanned count, amount/token, amber pending, mock payment, live green row without refresh, customer verified state, abandon without a webhook, and live red row after real expiry. Twenty webhook-received-to-board-DOM samples measured **p95 116 ms**. Reviewed screenshots are in `docs/test-evidence/`; raw frames/logs and full output are ignored under `tests/artifacts/`.
+
+## Remaining limits
+
+Duplicate events are not exercised concurrently and emitted WebSocket announcements are not counted. No live provider, production SMS, hosting/deployment, real-phone test, or vendor survey was run. npm audit findings remain untriaged. These results do not establish production security or scam prevention.

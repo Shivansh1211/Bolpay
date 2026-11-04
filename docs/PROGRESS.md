@@ -2,37 +2,45 @@
 
 ## Current state
 
-- Branch: `codex-takeover`; last known clean baseline includes Step 1 Docker/configuration and smoke-test commits.
-- Step 1 has previously been reported green in the preceding task. The required unified runner did not exist and is being established in this continuation.
-- Current step: Steps 2, 3, voice announcement, and deploy preparation are complete and verified; proceeding to Playwright/attack tests.
-- Step 3 `tests/run-all.ps1` passed: 18 Maven tests, 0 failures/errors/skips, followed by passing Docker/API smoke checks. Docker engine version is 29.4.0.
-- No migration has been edited or database volume deleted.
+- Branch: `codex/wip-playwright-evidence`.
+- Step 2, Step 3, voice, and deployment preparation are complete at tags `step2-pass`, `step3-pass`, `voice-pass`, and `deploy-prep-pass`.
+- WebSocket fix and full test gate pass on the current workspace. UI redesign has not started; wait for approval of `docs/design-plan.md` before building UI.
+- No migration or database volume was edited/deleted.
 
-## Proof and failures
+## WebSocket reproduction and root cause
 
-- Step 2 commit: `6319b8d` (`Complete Step 2 security gate`), tagged `step2-pass`.
-- Step 3 commit: `6b0cc6d` (`Complete Step 3 flow correctness gate`), tagged `step3-pass`.
-- Step 3 proof: suite covered stored scan sessions, concurrent distinct active tokens, 2-to-3 digit fallback only after exhausting all 2-digit tokens, scheduled expiry, and mock payment with dropped webhook followed by gateway reconciliation. Smoke output included `PASS: public scan session was persisted in PostgreSQL.` and ended `ALL TESTS PASSED.`
-- Step 3 migration preflight: read-only count of duplicate pending `(vendor_id, token)` groups in the existing local database returned `0`; V7 remains additive and V1-V6 are unchanged.
-- Voice proof: `tests/run-all.ps1` passed with frontend Vite build successful, 18 Maven tests (0 failures/errors/skips), and smoke checks ending `ALL TESTS PASSED.` Voice defaults off until enabled; browser voice behavior is not yet covered by Playwright.
-- Deploy-prep proof: production Compose config passed with temporary dummy values; production frontend/Nginx image built; full runner ended `ALL TESTS PASSED.` Provider-neutral template binds frontend to loopback and does not publish backend/PostgreSQL ports.
-- Deploy-prep failure fixed: the first production frontend build failed because `NGINX_CONFIG` was declared only in the Node build stage. It is now declared in the Nginx stage; the full rerun passed. Compose checks now use a temporary dummy env file. A separate non-quiet diagnostic command had printed resolved local `.env` values in tool output; no values were saved to source files. Rotate any real credentials from that file before using them.
-- Frontend package install reported 15 npm audit findings (14 moderate, 1 high); details remain untriaged and are a known gap.
-- `docker info --format '{{.ServerVersion}}'`: `29.4.0`.
-- Step 2 runner proof: Maven `Tests run: 14, Failures: 0, Errors: 0, Skipped: 0`; smoke output ended `STEP 1 SMOKE TESTS PASSED.` / `ALL TESTS PASSED.`
-- Failures fixed: Maven attempted localhost PostgreSQL without a test database; added a disposable Postgres container. Webhook negative tests hit a Java HTTP authentication retry in streaming mode; switched the helper to `HttpURLConnection` with fixed content length. OTP hash exceeded the original column length; added additive V6 migration.
-- No applied migration was edited and no database volume was deleted.
+- Before the fix, Chromium received raw STOMP `ERROR` with exact header `message:Failed to send message to ExecutorSubscribableChannel[clientInboundChannel]`; the frame is preserved in ignored `tests/artifacts/ws-error-frame.log`.
+- Matching backend diagnostic at `2026-11-04T21:44:20.300Z`: `vendorTopic=true, numericDestination=true, principalPresent=false, destinationMatchesPrincipal=false`; the same session logged Spring's inbound channel failure at `21:44:20.301Z`. Raw evidence is in ignored `tests/artifacts/backend-websocket-cause.log`.
+- The CONNECT interceptor reads native STOMP `Authorization: Bearer ...`, validates the JWT, and uses the JWT `vendorId` claim as the principal name (decimal string); it separately logs the `phoneNumber` claim. Existing `WebSocketSecurityConfigTest` built `Principal("41")` by hand and did not exercise a real signed JWT.
+- Root cause: `StompHeaderAccessor.wrap(message)` mutated a detached wrapper while `preSend` returned the original message, so later SUBSCRIBE frames had no principal. Fixed by obtaining the accessor attached to the inbound message with `MessageHeaderAccessor.getAccessor`. Vendor-topic exact-match authorization remains unchanged.
+- `WebSocketStompIntegrationTest` now uses a signed JWT and real SockJS/STOMP socket: own vendor topic receives a message; another vendor's topic is denied; absent or invalid JWT is denied during CONNECT.
 
-## Next
+## Latest full verification
 
-1. Voice commit: `df64391` (`Add vendor voice payment announcements`), tagged `voice-pass`.
-2. Commit and tag deploy preparation as `deploy-prep-pass` (full runner is green).
-3. Continue Playwright/attack tests, then prepare `docs/design-plan.md`, run the gate, and stop for approval before any UI implementation.
+- Command: `pwsh -NoProfile -File tests/run-all.ps1` (exit 0).
+- Compose configuration, provider-neutral production Compose validation, production frontend build, backend tests, Docker/API smoke checks, and Chromium Playwright all passed.
+- Maven: 22 tests, 0 failures, 0 errors, 0 skipped. The real-STOMP integration test passed.
+- Playwright: scan -> Scanned counter -> amount/token -> pending amber row -> mock pay -> paid green row updated live without refresh -> customer Payment verified -> Abandon without webhook -> server expiry turns row red. Captures also showed browser STOMP `CONNECTED` and `MESSAGE` frames; no `ERROR` frame occurred in the live-flow run.
+- Latency: 20 webhook-received-to-board-DOM samples; p95 **116 ms**, recorded in ignored `tests/artifacts/latency.json`.
+- Runner final lines: `1 passed (19.6s)`, `PASS: Playwright customer flow, vendor live board, voice announcement, screenshots, and webhook latency samples`, `ALL TESTS PASSED.` Full transcript: ignored `tests/artifacts/full-run-output.txt`; safe excerpt: `docs/test-run-output.txt`.
+- Reviewed, redacted screenshots are in `docs/test-evidence/`. Raw artifacts stay ignored.
+
+## Security proof and limitations
+
+- Exact WebSocket proofs: `WebSocketStompIntegrationTest.signedJwtCanSubscribeToOwnTopicButNotAnotherVendorsTopic`; `WebSocketStompIntegrationTest.missingAndInvalidJwtAreDeniedDuringStompConnect`.
+- Webhook proof: `AttackSuiteTest.webhookWithoutSignatureIsRejected`, `testForgedWebhook_BadSignature`, `correctlySignedWebhookWithStaleTimestampIsRejected`, `webhookMissingEventIdOrAmountIsRejected`, `testDuplicateWebhook_Idempotent`, and `testWrongAmountWebhook_Rejected`.
+- Other proof: `registrationWithoutOtpProofIsRejected`, `otpIsNotReturnedToClientByDefault`, `vendorCannotReadAnotherVendorsOrderByCode`, `scanSessionsArePersistedAndCountedForVendorBoard`, `concurrentOrderCreationAllocatesDistinctActiveTokens`, and `OrderTokenAllocationTest` two/three-digit cases.
+- Fake-screen test waits for configured expiry; lost-webhook test uses mock `scenario=drop` and reconciliation, not manual status edits.
+- Not fixed: duplicate deliveries are not tested concurrently and emitted announcements are not counted; npm audit findings remain untriaged; live gateway/SMS/hosting/deployment, real-phone checks, vendor survey, and optional historical tag reruns remain outstanding. UI work awaits the design-plan approval gate.
+- The prototype is not production-ready and does not claim to prevent scams.
 
 ## Resume commands
 
 ```powershell
 Set-Location 'C:\Users\shiva\CascadeProjects\bolpay'
+git switch codex/wip-playwright-evidence
 git status --short --branch
-pwsh -File tests/run-all.ps1
+pwsh -NoProfile -File tests/run-all.ps1
 ```
+
+- WIP commit: cc8a96c on codex/wip-playwright-evidence; 	ests-pass tag created after the successful full run. Raw runner output and latency samples remain git-ignored.

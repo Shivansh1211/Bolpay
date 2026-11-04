@@ -390,7 +390,7 @@ def create_order():
         'order_currency': order_currency,
         'order_expiry_time': order_expiry_time,
         'order_meta': data.get('order_meta', {}),
-        'return_url': data.get('return_url', '')
+        'return_url': data.get('return_url') or data.get('order_meta', {}).get('return_url', '')
     }
     
     return jsonify({
@@ -480,7 +480,11 @@ def send_webhook():
     try:
         import requests
         response = requests.post(webhook_url, data=payload_str, headers=headers, timeout=5)
-        return jsonify({'status': 'webhook sent', 'response_code': response.status_code})
+        return jsonify({
+            'status': 'webhook sent',
+            'response_code': response.status_code,
+            'webhook_received_at_ms': response.headers.get('X-Webhook-Received-At')
+        })
     except Exception as e:
         return jsonify({'status': 'webhook failed', 'error': str(e)})
 

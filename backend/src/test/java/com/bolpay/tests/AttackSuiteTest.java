@@ -21,6 +21,11 @@ import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.boot.test.web.server.LocalServerPort;
+import org.slf4j.LoggerFactory;
+import ch.qos.logback.classic.Logger;
+import ch.qos.logback.classic.LoggerContext;
+import ch.qos.logback.classic.spi.ILoggingEvent;
+import ch.qos.logback.core.read.ListAppender;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -157,6 +162,22 @@ public class AttackSuiteTest {
         Map<String, Object> payload = Map.of("event_id", "evt_unsigned", "order_code", order.getOrderCode(),
                 "amount", "100", "status", "success");
         assertEquals(401, postWebhook(payload, null, false).getStatusCode().value());
+        assertEquals("PENDING", orderRepository.findByOrderCode(order.getOrderCode()).orElseThrow().getStatus().name());
+    }
+
+    @Test
+    void correctlySignedWebhookWithStaleTimestampIsRejected() {
+        CreateOrderRequest request = new CreateOrderRequest();
+        request.setVendorSlug(testVendor.getSlug());
+        request.setAmount(new BigDecimal("100"));
+        OrderDto order = orderService.createOrder(request, "test-device");
+        Map<String, Object> payload = Map.of("event_id", "evt_stale_timestamp", "order_code", order.getOrderCode(),
+                "amount", "100", "status", "success");
+        long staleTimestamp = System.currentTimeMillis() / 1000 - 301;
+
+        ResponseEntity<Map> response = postWebhook(payload, null, true, staleTimestamp);
+
+        assertEquals(401, response.getStatusCode().value());
         assertEquals("PENDING", orderRepository.findByOrderCode(order.getOrderCode()).orElseThrow().getStatus().name());
     }
 
@@ -330,10 +351,24 @@ public class AttackSuiteTest {
     @Test
     void otpIsNotReturnedToClientByDefault() throws Exception {
         String phone = "9" + String.format("%09d", Math.floorMod(System.nanoTime(), 1_000_000_000L));
-        ResponseEntity<String> response = restTemplate.postForEntity("/api/auth/send-otp",
-                Map.of("phoneNumber", phone), String.class);
-        assertTrue(response.getStatusCode().is2xxSuccessful());
-        assertFalse(response.getBody().contains("\"otp\""));
+        LoggerContext loggerContext = (LoggerContext) LoggerFactory.getILoggerFactory();
+        ListAppender<ILoggingEvent> appender = new ListAppender<>();
+        appender.setContext(loggerContext);
+        appender.start();
+        Logger rootLogger = (Logger) LoggerFactory.getLogger(Logger.ROOT_LOGGER_NAME);
+        rootLogger.addAppender(appender);
+        try {
+            ResponseEntity<String> response = restTemplate.postForEntity("/api/auth/send-otp",
+                    Map.of("phoneNumber", phone), String.class);
+            assertTrue(response.getStatusCode().is2xxSuccessful());
+            assertFalse(response.getBody().contains("\"otp\""));
+            assertFalse(response.getBody().matches("(?s).*\\b\\d{6}\\b.*"), "A raw six-digit OTP appeared in the API response.");
+            assertTrue(appender.list.stream().noneMatch(event -> event.getFormattedMessage().matches("(?s).*\\b\\d{6}\\b.*")),
+                    "A raw six-digit OTP appeared in application logs.");
+        } finally {
+            rootLogger.detachAppender(appender);
+            appender.stop();
+        }
     }
 
     @Test
@@ -431,9 +466,15 @@ public class AttackSuiteTest {
     }
 
     private ResponseEntity<Map> postWebhook(Map<String, Object> body, String overrideSignature, boolean includeSignature) {
+        return postWebhook(body, overrideSignature, includeSignature, null);
+    }
+
+    private ResponseEntity<Map> postWebhook(Map<String, Object> body, String overrideSignature,
+                                            boolean includeSignature, Long timestampOverride) {
         try {
             String raw = objectMapper.writeValueAsString(body);
-            String timestamp = Long.toString(System.currentTimeMillis() / 1000);
+            String timestamp = Long.toString(timestampOverride == null
+                    ? System.currentTimeMillis() / 1000 : timestampOverride);
             String signature = overrideSignature == null ? sign(timestamp + raw) : overrideSignature;
             java.net.HttpURLConnection connection = (java.net.HttpURLConnection) new java.net.URL(
                     "http://localhost:" + serverPort + "/api/webhook/payment").openConnection();

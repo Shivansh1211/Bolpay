@@ -19,3 +19,16 @@
 - Extended the full runner to validate production Compose with dummy values and build the production frontend/Nginx image.
 - Fixed production frontend build-argument scoping so the production Nginx config is copied into the Nginx image.
 - Isolated production Compose checks to a temporary dummy env file so they do not resolve the user's local `.env` values.
+- Corrected continuation status and attack evidence: recorded the current Docker-engine test failure and explicitly listed missing timestamp-replay, OTP-log, and end-to-end WebSocket proofs.
+- Added a requirement-by-requirement compliance matrix with source/test evidence and an explicit not-fixed list.
+- Fixed development Compose startup ordering so Nginx starts after backend DNS is available, addressing the frontend container exit found by the full smoke gate.
+- Switched the frontend STOMP client import to the package's browser-only entry after Playwright exposed a blank dashboard and Vite's Node `net` externalization warning.
+- Fixed the null initial board render, customer order API call/checkout closure, and amount label association exposed by Chromium flow testing.
+- Allowed only SockJS HTTP transport through the stateless HTTP auth filter while retaining required JWT validation on STOMP CONNECT; added a missing-credential regression test.
+- Fixed mock gateway checkout return URLs to carry `order_meta.return_url` through to the verified order page and routed the browser payment action to the mock handler.
+- Added stale signed-webhook timestamp and OTP response/log capture regression tests; latest Maven evidence is 20/20 passed.
+- Added Playwright customer/payment/abandon flow, full-runner integration, redacted screenshot artifacts, and p95 sampling; the current run stops before p95 because the legitimate STOMP subscription fails.
+- Recorded the Chromium null-board exception, its source cause, the repeated live-subscription failure, partial screenshots, and unavailable p95 without marking the full gate green.
+- Added real signed-JWT SockJS/STOMP integration coverage for own-topic delivery, cross-vendor denial, and missing/invalid JWT denial.
+- Published expired orders after commit so the live board turns red after scheduled expiry; Playwright now completes payment, verification, abandon, and expiry states.
+- Re-ran the complete Docker/Maven/Chromium gate successfully: 22 Maven tests passed and Playwright reported 1 passed; recorded p95 116 ms across 20 samples.
