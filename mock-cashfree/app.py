@@ -480,7 +480,11 @@ def send_webhook():
     try:
         import requests
         response = requests.post(webhook_url, data=payload_str, headers=headers, timeout=5)
-        return jsonify({'status': 'webhook sent', 'response_code': response.status_code})
+        return jsonify({
+            'status': 'webhook sent',
+            'response_code': response.status_code,
+            'webhook_received_at_ms': response.headers.get('X-Webhook-Received-At')
+        })
     except Exception as e:
         return jsonify({'status': 'webhook failed', 'error': str(e)})
 

@@ -19,3 +19,5 @@
 - Extended the full runner to validate production Compose with dummy values and build the production frontend/Nginx image.
 - Fixed production frontend build-argument scoping so the production Nginx config is copied into the Nginx image.
 - Isolated production Compose checks to a temporary dummy env file so they do not resolve the user's local `.env` values.
+- Corrected continuation status and attack evidence: recorded the current Docker-engine test failure and explicitly listed missing timestamp-replay, OTP-log, and end-to-end WebSocket proofs.
+- Added a requirement-by-requirement compliance matrix with source/test evidence and an explicit not-fixed list.

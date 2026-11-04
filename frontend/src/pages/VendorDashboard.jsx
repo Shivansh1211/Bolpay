@@ -103,8 +103,6 @@ const VendorDashboard = () => {
     // Connect to WebSocket for real-time updates (quiet by default)
     if (user?.id) {
       connectWebSocket((orderData) => {
-        console.log('Payment received:', orderData);
-        
         const isException = orderData.status === 'LATE_PAID' || orderData.status === 'FLAGGED';
         if (isException) {
           setRecentPayment(orderData);
@@ -369,7 +367,7 @@ const VendorDashboard = () => {
         {!glanceMode && (
           <>
             {/* Paying Now */}
-            <Card variant="default" padding="md" shadow="md" className="mb-4">
+            <Card data-testid="recent-paid-orders" variant="default" padding="md" shadow="md" className="mb-4">
               <h2 className="text-h3 font-bold text-text-primary mb-4 flex items-center gap-2">
                 <svg className="w-5 h-5 text-status-paying" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
@@ -410,7 +408,7 @@ const VendorDashboard = () => {
               ) : (
                 <div className="space-y-3">
                   {boardData.paidOrders.map((order, index) => (
-                    <div key={order.id} className={index < 3 ? 'ring-2 ring-status-paid rounded-sm' : ''}>
+                    <div key={order.id} data-testid={`paid-order-${order.id}`} className={index < 3 ? 'ring-2 ring-status-paid rounded-sm' : ''}>
                       <OrderRow order={order} type="paid" />
                     </div>
                   ))}

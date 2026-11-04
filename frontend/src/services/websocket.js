@@ -12,15 +12,12 @@ export const connectWebSocket = (onMessageCallback, vendorId, token) => {
   stompClient.reconnect_delay = 3000;
 
   stompClient.connect({ Authorization: `Bearer ${token}` }, () => {
-    console.log('WebSocket connected');
-    
     // Subscribe to vendor-specific topic
     if (vendorId) {
       const subscription = stompClient.subscribe(
         `/topic/vendor/${vendorId}`,
         (message) => {
           const orderData = JSON.parse(message.body);
-          console.log('Received order update:', orderData);
           if (onMessageCallback) {
             onMessageCallback(orderData);
           }

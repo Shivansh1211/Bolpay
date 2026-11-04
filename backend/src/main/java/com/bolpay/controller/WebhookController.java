@@ -27,6 +27,7 @@ public class WebhookController {
             @RequestBody String payload,
             @RequestHeader(value = "X-Webhook-Signature", required = false) String signature,
             @RequestHeader(value = "X-Webhook-Timestamp", required = false) String timestamp) {
+        long receivedAtEpochMs = System.currentTimeMillis();
         if (signature == null || timestamp == null || signature.isBlank() || timestamp.isBlank()) {
             return ResponseEntity.status(401).body(Map.of("error", "Missing signature or timestamp"));
         }
@@ -54,9 +55,9 @@ public class WebhookController {
             try {
                 processingService.process(eventId, payload, orderCode, amount, status, gatewayRef);
             } catch (DataIntegrityViolationException duplicate) {
-                return ResponseEntity.ok(Map.of("message", "Duplicate event already handled"));
+                return acceptedResponse("Duplicate event already handled", receivedAtEpochMs);
             }
-            return ResponseEntity.ok(Map.of("message", "Webhook accepted"));
+            return acceptedResponse("Webhook accepted", receivedAtEpochMs);
         } catch (IllegalArgumentException ex) {
             return ResponseEntity.badRequest().body(Map.of("error", ex.getMessage()));
         } catch (Exception ex) {
@@ -66,4 +67,10 @@ public class WebhookController {
     }
 
     private String text(Object value) { return value == null ? null : value.toString(); }
+
+    private ResponseEntity<Map<String, String>> acceptedResponse(String message, long receivedAtEpochMs) {
+        return ResponseEntity.ok()
+                .header("X-Webhook-Received-At", Long.toString(receivedAtEpochMs))
+                .body(Map.of("message", message));
+    }
 }
