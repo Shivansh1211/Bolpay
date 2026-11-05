@@ -2,55 +2,56 @@ import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { vendorAPI, orderAPI } from '../services/api';
 import Button from '../components/Button';
-import Card from '../components/Card';
 import Input from '../components/Input';
-import TokenDisplay from '../components/TokenDisplay';
-import StatusBadge from '../components/StatusBadge';
+import { LanguageSelect, useTranslation } from '../i18n';
+
+const StateIcon = ({ state }) => {
+  if (state === 'paid') return <span aria-hidden="true">✓</span>;
+  if (state === 'expired') return <span aria-hidden="true">×</span>;
+  if (state === 'late') return <span aria-hidden="true">!</span>;
+  return <span aria-hidden="true">◷</span>;
+};
 
 const VendorPage = () => {
   const { slug } = useParams();
   const navigate = useNavigate();
+  const { language, setLanguage, t } = useTranslation();
   const [vendor, setVendor] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [amount, setAmount] = useState('');
-  const [deviceId, setDeviceId] = useState('');
   const [order, setOrder] = useState(null);
   const [creating, setCreating] = useState(false);
-  const [orderStatus, setOrderStatus] = useState(null); // Poll for status
+  const [orderStatus, setOrderStatus] = useState(null);
+  const [timeLeft, setTimeLeft] = useState(0);
 
   useEffect(() => {
     const fetchVendor = async () => {
       try {
         const response = await vendorAPI.getBySlug(slug);
         setVendor(response.data);
-      } catch (err) {
-        setError('Vendor not found');
+      } catch {
+        setError('vendor');
       } finally {
         setLoading(false);
       }
     };
 
-    // Generate or retrieve device ID for fingerprinting
-    let storedDeviceId = localStorage.getItem('bolpay_device_id');
-    if (!storedDeviceId) {
-      storedDeviceId = 'dev_' + Math.random().toString(36).substring(2, 15);
-      localStorage.setItem('bolpay_device_id', storedDeviceId);
+    let deviceId = localStorage.getItem('bolpay_device_id');
+    if (!deviceId) {
+      deviceId = `dev_${Math.random().toString(36).substring(2, 15)}`;
+      localStorage.setItem('bolpay_device_id', deviceId);
     }
-    setDeviceId(storedDeviceId);
 
-    // Track scan session
     const trackScan = async () => {
       try {
         await fetch(`/api/public/scan/${slug}`, {
           method: 'POST',
-          headers: {
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({ deviceId: storedDeviceId })
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ deviceId }),
         });
-      } catch (err) {
-        // Silently fail scan tracking
+      } catch {
+        // Scan metrics are best-effort and must not block payment.
       }
     };
 
@@ -58,245 +59,174 @@ const VendorPage = () => {
     trackScan();
   }, [slug]);
 
-  // Poll for order status when order exists
   useEffect(() => {
-    if (!order) return;
+    if (!order) return undefined;
 
     const pollStatus = async () => {
       try {
         const response = await fetch(`/api/orders/${order.orderCode}/status`);
+        if (!response.ok) return false;
         const data = await response.json();
         setOrderStatus(data);
-        
-        // If paid, stop polling
-        if (data.status === 'PAID') {
-          return true;
+        if (data.expiresAt) {
+          setTimeLeft(Math.max(0, Math.floor((new Date(data.expiresAt) - Date.now()) / 1000)));
         }
-        return false;
-      } catch (err) {
-        console.error('Failed to poll status:', err);
+        return data.status === 'PAID';
+      } catch {
         return false;
       }
     };
 
-    // Poll every 2 seconds
-    const interval = setInterval(async () => {
-      const shouldStop = await pollStatus();
-      if (shouldStop) {
-        clearInterval(interval);
+    let interval;
+    pollStatus().then((paid) => {
+      if (!paid) {
+        interval = setInterval(async () => {
+          if (await pollStatus()) clearInterval(interval);
+        }, 2000);
       }
-    }, 2000);
+    });
+    const countdown = setInterval(() => setTimeLeft((value) => Math.max(0, value - 1)), 1000);
 
-    // Initial poll
-    pollStatus();
-
-    return () => clearInterval(interval);
+    return () => {
+      clearInterval(interval);
+      clearInterval(countdown);
+    };
   }, [order]);
 
-  const handleCreateOrder = async (e) => {
-    e.preventDefault();
+  const handleCreateOrder = async (event) => {
+    event.preventDefault();
     if (!amount || creating) return;
 
+    setError('');
     setCreating(true);
     try {
-      const response = await orderAPI.create({
-        vendorSlug: slug,
-        amount: parseFloat(amount)
-      });
-      const createdOrder = response.data;
-      setOrder(createdOrder);
-      
-      // Auto-open checkout after order creation
-      setTimeout(() => {
-        openCheckout(createdOrder);
-      }, 500);
-    } catch (err) {
-      console.error('Failed to create order:', err);
-      alert('Failed to create order');
+      const response = await orderAPI.create({ vendorSlug: slug, amount: parseFloat(amount) });
+      setOrder(response.data);
+      setTimeLeft(Math.max(0, Math.floor((new Date(response.data.expiresAt) - Date.now()) / 1000)));
+      window.setTimeout(() => openCheckout(response.data), 500);
+    } catch {
+      setError('payment');
     } finally {
       setCreating(false);
     }
   };
 
   const openCheckout = (checkoutOrder = order) => {
-    if (checkoutOrder?.paymentSessionId) {
-      // Use public URL for checkout (must be reachable from phone)
-      const publicBaseUrl = import.meta.env.VITE_PUBLIC_BASE_URL || window.location.origin;
-      const mockCheckoutUrl = `${publicBaseUrl}/checkout/${checkoutOrder.paymentSessionId}`;
-      window.open(mockCheckoutUrl, '_blank');
-    }
+    if (!checkoutOrder?.paymentSessionId) return;
+    const publicBaseUrl = import.meta.env.VITE_PUBLIC_BASE_URL || window.location.origin;
+    window.open(`${publicBaseUrl}/checkout/${checkoutOrder.paymentSessionId}`, '_blank', 'noopener');
   };
 
   if (loading) {
-    return (
-      <div className="min-h-screen bg-secondary flex items-center justify-center">
-        <div className="text-text-primary text-h1">Loading...</div>
-      </div>
-    );
+    return <div className="app-shell flex min-h-screen items-center justify-center"><p role="status">{t('loading')}</p></div>;
   }
 
-  if (error || !vendor) {
-    return (
-      <div className="min-h-screen bg-secondary flex items-center justify-center">
-        <div className="text-text-primary text-h1">{error || 'Vendor not found'}</div>
-      </div>
-    );
+  if (error === 'vendor' || !vendor) {
+    return <div className="app-shell flex min-h-screen items-center justify-center"><p role="alert">{t('vendorNotFound')}</p></div>;
   }
+
+  const state = orderStatus?.status === 'PAID' ? 'paid'
+    : orderStatus?.status === 'EXPIRED' ? 'expired'
+      : orderStatus?.status === 'LATE_PAID' ? 'late' : 'waiting';
 
   return (
-    <div className="min-h-screen bg-secondary">
-      {/* Header */}
-      <div className="bg-brand border-b-4 border-brand-dark">
-        <div className="max-w-md mx-auto px-4 py-4 flex items-center justify-between">
+    <div className="app-shell">
+      <header className="app-header">
+        <div className="app-header-inner">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-white rounded-sm flex items-center justify-center">
-              <span className="text-brand font-bold text-lg">B</span>
-            </div>
-            <span className="text-white font-semibold text-h3">BolPay</span>
+            <img src="/brand/bolpay-logo.svg" alt="" aria-hidden="true" className="h-11 w-auto" />
+            <h1 className="sr-only">BolPay</h1>
           </div>
-          <div className="text-white/80 text-small">Secure Payment</div>
+          <div className="flex items-center gap-3">
+            <span className="hidden text-small sm:inline">{t('securePayment')}</span>
+            <LanguageSelect language={language} setLanguage={setLanguage} />
+          </div>
         </div>
-      </div>
+      </header>
 
-      <div className="max-w-md mx-auto px-4 py-8">
+      <main className="customer-width py-8">
         {!order ? (
-          <>
-            {/* Merchant Card */}
-            <Card variant="default" padding="lg" shadow="lg" className="mb-6">
-              <div className="flex items-center gap-4 mb-6">
-                <div className="w-16 h-16 bg-brand rounded-sm flex items-center justify-center">
-                  <span className="text-white text-2xl font-bold">{vendor.businessName?.charAt(0) || 'M'}</span>
-                </div>
-                <div>
-                  <h1 className="text-h2 font-bold text-text-primary">{vendor.businessName}</h1>
-                  <p className="text-text-secondary text-small">UPI ID: {vendor.upiId || 'Not set'}</p>
-                </div>
+          <section className="panel" aria-labelledby="payment-title">
+            <p className="field-label">{t('pay')}</p>
+            <h1 id="payment-title" className="section-heading">{vendor.businessName}</h1>
+            <p className="mb-1 font-semibold">{vendor.businessName}</p>
+            <p className="mb-6 text-small text-text-secondary">{t('upiId')}: {vendor.upiId || t('notSet')}</p>
+
+            <form onSubmit={handleCreateOrder}>
+              <div className="mb-3">
+                <Input
+                  id="amount"
+                  label={t('enterAmount')}
+                  type="number"
+                  min="1"
+                  step="0.01"
+                  required
+                  value={amount}
+                  onChange={(event) => setAmount(event.target.value)}
+                  prefix="₹"
+                  placeholder="0"
+                  inputMode="decimal"
+                  autoFocus
+                  className="amount-value pl-12"
+                />
               </div>
-
-              <form onSubmit={handleCreateOrder}>
-                <div className="mb-6">
-                  <Input
-                    id="amount"
-                    label="Enter amount"
-                    type="number"
-                    min="1"
-                    step="0.01"
-                    required
-                    value={amount}
-                    onChange={(e) => setAmount(e.target.value)}
-                    prefix="₹"
-                    placeholder="0"
-                    autoFocus
-                    className="text-4xl font-bold pl-16 pr-4 py-4"
-                  />
-                </div>
-
-                <Button
-                  type="submit"
-                  variant="primary"
-                  size="lg"
-                  disabled={creating}
-                  loading={creating}
-                  className="w-full"
-                >
-                  Pay now
-                </Button>
-              </form>
-            </Card>
-
-            {/* Quick Amount Buttons */}
-            <Card variant="status" padding="md" className="mb-6">
-              <p className="text-text-secondary text-small mb-3">Quick amount</p>
-              <div className="grid grid-cols-4 gap-2">
-                {[10, 50, 100, 500].map((val) => (
-                  <button
-                    key={val}
-                    onClick={() => setAmount(val.toString())}
-                    className="bg-white border-2 border-gray-200 hover:border-brand hover:text-brand py-3 rounded-sm font-semibold transition-all text-text-primary"
-                  >
-                    ₹{val}
-                  </button>
-                ))}
-              </div>
-            </Card>
-
-            {/* Security Badge */}
-            <div className="flex items-center justify-center gap-2 text-text-secondary text-small">
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
-              </svg>
-              <span>Secured by BolPay</span>
-            </div>
-          </>
-        ) : (
-          <>
-            {/* Token Card */}
-            <Card 
-              variant="default" 
-              padding="xl" 
-              shadow="lg" 
-              className={`mb-6 text-center ${
-                orderStatus?.status === 'PAID' ? 'border-4 border-status-paid' : ''
-              }`}
-            >
-              {orderStatus?.status === 'PAID' ? (
-                <>
-                  <div className="w-20 h-20 bg-status-paid/20 rounded-sm flex items-center justify-center mx-auto mb-4">
-                    <svg className="w-12 h-12 text-status-paid" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
-                    </svg>
-                  </div>
-                  <h2 className="text-h2 font-bold text-status-paid mb-4">Payment verified</h2>
-                  <TokenDisplay token={order.token} size="xl" animated={true} />
-                  <p className="text-h1 font-bold text-text-primary mb-2">₹{order.amount}</p>
-                  <p className="text-text-secondary text-small">Paid at {new Date(orderStatus.paidAt).toLocaleTimeString()}</p>
-                  <p className="text-text-secondary text-tiny mt-2">Show this to the vendor</p>
-                </>
-              ) : (
-                <>
-                  <div className="w-16 h-16 bg-status-paying/20 rounded-sm flex items-center justify-center mx-auto mb-4">
-                    <svg className="w-8 h-8 text-status-paying" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                    </svg>
-                  </div>
-                  <h2 className="text-h3 text-text-secondary mb-2">Your token</h2>
-                  <TokenDisplay token={order.token} size="xl" />
-                  <p className="text-h1 font-bold text-text-primary mb-2">₹{order.amount}</p>
-                  <div className="flex items-center justify-center gap-2 text-text-secondary mt-4">
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                    </svg>
-                    <span>Expires in {Math.ceil((new Date(order.expiresAt) - new Date()) / 1000)}s</span>
-                  </div>
-                  <p className="text-text-secondary text-small mt-4">Waiting for payment...</p>
-                </>
-              )}
-            </Card>
-
-            {/* Open Checkout Button (only if not paid) */}
-            {orderStatus?.status !== 'PAID' && (
-              <Button
-                variant="primary"
-                size="lg"
-                onClick={openCheckout}
-                className="w-full mb-4"
-              >
-                Open UPI app
+              <p className="mb-5 text-small text-text-secondary">{t('saveAmount')}</p>
+              {error === 'payment' && <p role="alert" className="mb-4 rounded-sm border-l-4 border-status-expired px-3 py-2">{t('paymentError')}</p>}
+              <Button type="submit" variant="primary" size="lg" disabled={creating} loading={creating} className="w-full">
+                {creating ? t('creatingOrder') : t('payNow')}
               </Button>
+            </form>
+          </section>
+        ) : (
+          <section className="panel" aria-labelledby="order-state-title">
+            <p className="field-label">{t('paymentStatus')}</p>
+            <div className={`live-state live-state--${state}`} role="status" aria-live="polite">
+              <span className="live-state-icon"><StateIcon state={state} /></span>
+              <h1 id="order-state-title" className="m-0 text-inherit">
+                {state === 'paid' ? t('paymentVerified')
+                  : state === 'expired' ? t('expiredTitle')
+                    : state === 'late' ? t('latePayment') : t('waitingForPayment')}
+              </h1>
+            </div>
+
+            {state === 'late' && (
+              <div className="mb-5 border-l-4 border-brand px-3 py-2">
+                <strong>{t('notConfirmedYet')}</strong>
+                <p className="mt-1">{t('waitOrAsk')}</p>
+              </div>
             )}
 
-            {/* Status Check */}
-            <Button
-              variant="ghost"
-              size="md"
-              onClick={() => navigate(`/o/${order.orderCode}`)}
-              className="w-full"
-            >
-              Check payment status
-            </Button>
-          </>
+            <span className="field-label">{t('amount')}</span>
+            <p className="amount-value mb-5">₹{order.amount}</p>
+            <span className="field-label">{t('token')}</span>
+            <p className="token-value">{order.token}</p>
+
+            {state === 'paid' ? (
+              <dl className="grid grid-cols-2 gap-4 border-t border-gray-300 pt-4">
+                <div><dt className="field-label">{t('verifiedAt')}</dt><dd>{orderStatus?.paidAt ? new Date(orderStatus.paidAt).toLocaleTimeString() : '—'}</dd></div>
+                <div><dt className="field-label">{t('reference')}</dt><dd className="break-all">{order.orderCode}</dd></div>
+              </dl>
+            ) : state === 'expired' ? (
+              <p className="border-t border-gray-300 pt-4">{t('askNewToken')}</p>
+            ) : (
+              <div className="border-t border-gray-300 pt-4">
+                <span className="field-label">{t('payBefore')}</span>
+                <strong>{timeLeft > 0 ? `${Math.floor(timeLeft / 60)}:${String(timeLeft % 60).padStart(2, '0')}` : t('paymentWindowExpired')}</strong>
+                <p className="mt-4 text-small text-text-secondary">{t('pageUpdates')}</p>
+              </div>
+            )}
+
+            {state === 'waiting' && (
+              <Button variant="primary" size="lg" onClick={() => openCheckout()} className="mt-6 w-full">
+                {t('openUpiApp')}
+              </Button>
+            )}
+            <button type="button" className="secondary-action mt-3 w-full" onClick={() => navigate(`/o/${order.orderCode}`)}>
+              {t('checkStatus')}
+            </button>
+          </section>
         )}
-      </div>
+      </main>
     </div>
   );
 };

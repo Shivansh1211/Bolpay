@@ -1,199 +1,106 @@
-import { useState, useEffect } from 'react';
-import { useParams } from 'react-router-dom';
+import { useEffect, useState } from 'react';
+import { useParams, useNavigate } from 'react-router-dom';
 import { orderAPI } from '../services/api';
-import Button from '../components/Button';
-import Card from '../components/Card';
-import TokenDisplay from '../components/TokenDisplay';
-import StatusBadge from '../components/StatusBadge';
+import { LanguageSelect, useTranslation } from '../i18n';
 
 const OrderStatusPage = () => {
   const { orderCode } = useParams();
+  const navigate = useNavigate();
+  const { language, setLanguage, t } = useTranslation();
   const [order, setOrder] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
+  const [error, setError] = useState(false);
   const [timeLeft, setTimeLeft] = useState(0);
 
   useEffect(() => {
+    let active = true;
     const fetchOrderStatus = async () => {
       try {
         const response = await orderAPI.getStatus(orderCode);
+        if (!active) return;
         setOrder(response.data);
-        
-        // Calculate time remaining
         if (response.data.expiresAt) {
-          const expiresAt = new Date(response.data.expiresAt);
-          const now = new Date();
-          const diff = Math.max(0, Math.floor((expiresAt - now) / 1000));
-          setTimeLeft(diff);
+          setTimeLeft(Math.max(0, Math.floor((new Date(response.data.expiresAt) - Date.now()) / 1000)));
         }
-      } catch (err) {
-        setError('Order not found');
+        setError(false);
+      } catch {
+        if (active) setError(true);
       } finally {
-        setLoading(false);
+        if (active) setLoading(false);
       }
     };
 
     fetchOrderStatus();
-
-    // Poll for status updates every 2 seconds
     const interval = setInterval(fetchOrderStatus, 2000);
-
-    return () => clearInterval(interval);
+    return () => {
+      active = false;
+      clearInterval(interval);
+    };
   }, [orderCode]);
 
-  // Countdown timer
   useEffect(() => {
-    if (timeLeft > 0) {
-      const timer = setInterval(() => {
-        setTimeLeft((prev) => Math.max(0, prev - 1));
-      }, 1000);
-      return () => clearInterval(timer);
-    }
-  }, [timeLeft]);
-
-  const formatTime = (seconds) => {
-    const mins = Math.floor(seconds / 60);
-    const secs = seconds % 60;
-    return `${mins}:${secs.toString().padStart(2, '0')}`;
-  };
+    const timer = setInterval(() => setTimeLeft((value) => Math.max(0, value - 1)), 1000);
+    return () => clearInterval(timer);
+  }, []);
 
   if (loading) {
-    return (
-      <div className="min-h-screen bg-secondary flex items-center justify-center">
-        <div className="text-text-primary text-h1">Loading...</div>
-      </div>
-    );
+    return <div className="app-shell flex min-h-screen items-center justify-center"><p role="status">{t('loading')}</p></div>;
   }
 
   if (error || !order) {
     return (
-      <div className="min-h-screen bg-secondary flex items-center justify-center">
-        <div className="text-text-primary text-h1">{error || 'Order not found'}</div>
+      <div className="app-shell min-h-screen">
+        <header className="app-header"><div className="app-header-inner"><img src="/brand/bolpay-logo.svg" alt="BolPay" className="h-11 w-auto" /><LanguageSelect language={language} setLanguage={setLanguage} /></div></header>
+        <main className="customer-width py-8"><div className="panel" role="alert"><h1 className="section-heading">{t('orderNotFound')}</h1><p>{t('statusError')}</p><button className="secondary-action mt-5 w-full" onClick={() => navigate(-1)}>{t('done')}</button></div></main>
       </div>
     );
   }
 
-  const isPaid = order.status === 'PAID';
-  const isExpired = order.status === 'EXPIRED';
-  const isPending = order.status === 'PENDING';
+  const state = order.status === 'PAID' ? 'paid'
+    : order.status === 'EXPIRED' ? 'expired'
+      : order.status === 'LATE_PAID' ? 'late' : 'waiting';
 
   return (
-    <div className="min-h-screen bg-secondary flex items-center justify-center px-4 py-8">
-      <div className="max-w-md w-full">
-        {/* Paid State */}
-        {isPaid && (
-          <Card variant="default" padding="xl" shadow="lg" className="text-center border-4 border-status-paid">
-            <div className="w-24 h-24 bg-status-paid/20 rounded-sm flex items-center justify-center mx-auto mb-6">
-              <svg className="w-16 h-16 text-status-paid" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
-              </svg>
-            </div>
-            <h1 className="text-h2 font-bold text-status-paid mb-2">Payment verified</h1>
-            <p className="text-text-secondary mb-6">Your payment has been confirmed</p>
-            <div className="bg-status-paid/10 rounded-sm p-6 mb-6">
-              <p className="text-5xl font-bold text-text-primary mb-2">₹{order.amount}</p>
-              <p className="text-small text-text-secondary">Token: {order.token}</p>
-              <p className="text-tiny text-text-secondary">Order: {order.orderCode}</p>
-            </div>
-            <div className="text-small text-text-secondary">
-              Verified at {order.paidAt ? new Date(order.paidAt).toLocaleTimeString() : 'N/A'}
-            </div>
-            <div className="mt-6">
-              <Button variant="ghost" size="md" onClick={() => window.history.back()} className="w-full">
-                Done
-              </Button>
-            </div>
-          </Card>
-        )}
-
-        {/* Expired State */}
-        {isExpired && (
-          <Card variant="default" padding="xl" shadow="lg" className="text-center">
-            <div className="w-24 h-24 bg-status-expired/20 rounded-sm flex items-center justify-center mx-auto mb-6">
-              <svg className="w-16 h-16 text-status-expired" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M6 18L18 6M6 6l12 12" />
-              </svg>
-            </div>
-            <h1 className="text-h2 font-bold text-status-expired mb-2">This order timed out</h1>
-            <p className="text-text-secondary mb-6">Start again to get a new token</p>
-            <div className="bg-status-expired/10 rounded-sm p-6 mb-6">
-              <p className="text-5xl font-bold text-text-primary mb-2">₹{order.amount}</p>
-              <p className="text-small text-text-secondary">Token: {order.token} (expired)</p>
-              <p className="text-tiny text-text-secondary">Order: {order.orderCode}</p>
-            </div>
-            <Button
-              variant="danger"
-              size="lg"
-              onClick={() => window.history.back()}
-              className="w-full"
-            >
-              Try again
-            </Button>
-          </Card>
-        )}
-
-        {/* Pending State */}
-        {isPending && (
-          <Card variant="default" padding="xl" shadow="lg" className="text-center">
-            <div className="w-24 h-24 bg-status-paying/20 rounded-sm flex items-center justify-center mx-auto mb-6 animate-pulse-slow">
-              <svg className="w-16 h-16 text-status-paying" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
-            </div>
-            <h1 className="text-h2 font-bold text-text-primary mb-2">Waiting for payment</h1>
-            <p className="text-text-secondary mb-6">Complete payment in your UPI app</p>
-            <div className="bg-status-paying/10 rounded-sm p-6 mb-6">
-              <p className="text-5xl font-bold text-text-primary mb-2">₹{order.amount}</p>
-              <p className="text-small text-text-secondary">Token: {order.token}</p>
-              <p className="text-tiny text-text-secondary">Order: {order.orderCode}</p>
-            </div>
-            
-            {/* Countdown Timer */}
-            {timeLeft > 0 ? (
-              <div className="mb-6">
-                <p className="text-small text-text-secondary mb-2">Time remaining</p>
-                <div className="text-5xl font-bold text-status-paying">
-                  {formatTime(timeLeft)}
-                </div>
-              </div>
-            ) : (
-              <div className="mb-6">
-                <p className="text-small text-status-expired font-semibold">Payment window expired</p>
-              </div>
-            )}
-
-            <p className="text-text-secondary text-small">
-              This page updates automatically. Don't close it.
-            </p>
-          </Card>
-        )}
-
-        {/* Demo: Simulate Payment Button (only for pending orders) */}
-        {isPending && (
-          <div className="mt-6 text-center">
-            <Button
-              variant="ghost"
-              size="md"
-              onClick={async () => {
-                try {
-                  await fetch('http://localhost:8080/api/webhook/simulate-payment', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ order_code: orderCode }),
-                  });
-                  const response = await orderAPI.getStatus(orderCode);
-                  setOrder(response.data);
-                } catch (err) {
-                  console.error('Failed to simulate payment:', err);
-                }
-              }}
-              className="w-full"
-            >
-              Demo: Simulate payment
-            </Button>
+    <div className="app-shell min-h-screen">
+      <header className="app-header">
+        <div className="app-header-inner">
+          <img src="/brand/bolpay-logo.svg" alt="BolPay" className="h-11 w-auto" />
+          <LanguageSelect language={language} setLanguage={setLanguage} />
+        </div>
+      </header>
+      <main className="customer-width py-8">
+        <section className="panel" aria-labelledby="status-title">
+          <p className="field-label">{t('paymentStatus')}</p>
+          <div className={`live-state live-state--${state}`} role="status" aria-live="polite">
+            <span className="live-state-icon" aria-hidden="true">{state === 'paid' ? '✓' : state === 'expired' ? '×' : state === 'late' ? '!' : '◷'}</span>
+            <h1 id="status-title" className="m-0 text-inherit">{state === 'paid' ? t('paymentVerified') : state === 'expired' ? t('expiredTitle') : state === 'late' ? t('latePayment') : t('waitingForPayment')}</h1>
           </div>
-        )}
-      </div>
+
+          {state === 'late' && <div className="mb-5 border-l-4 border-brand px-3 py-2"><strong>{t('notConfirmedYet')}</strong><p className="mt-1">{t('waitOrAsk')}</p></div>}
+          {state === 'paid' && <p className="mb-5">{t('paymentConfirmed')}</p>}
+
+          <span className="field-label">{t('amount')}</span>
+          <p className="amount-value mb-5">₹{order.amount}</p>
+          <span className="field-label">{t('token')}</span>
+          <p className="token-value">{order.token}</p>
+
+          {state === 'paid' ? (
+            <dl className="grid grid-cols-2 gap-4 border-t border-gray-300 pt-4">
+              <div><dt className="field-label">{t('verifiedAt')}</dt><dd>{order.paidAt ? new Date(order.paidAt).toLocaleTimeString() : '—'}</dd></div>
+              <div><dt className="field-label">{t('reference')}</dt><dd className="break-all">{order.orderCode}</dd></div>
+            </dl>
+          ) : state === 'expired' ? (
+            <p className="border-t border-gray-300 pt-4">{t('askNewToken')}</p>
+          ) : (
+            <div className="border-t border-gray-300 pt-4">
+              <span className="field-label">{t('payBefore')}</span>
+              <strong>{timeLeft > 0 ? `${Math.floor(timeLeft / 60)}:${String(timeLeft % 60).padStart(2, '0')}` : t('paymentWindowExpired')}</strong>
+              <p className="mt-4 text-small text-text-secondary">{t('pageUpdates')}</p>
+            </div>
+          )}
+          <button type="button" className="secondary-action mt-6 w-full" onClick={() => navigate(-1)}>{t('done')}</button>
+        </section>
+      </main>
     </div>
   );
 };

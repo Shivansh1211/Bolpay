@@ -33,3 +33,14 @@
 - Published expired orders after commit so the live board turns red after scheduled expiry; Playwright now completes payment, verification, abandon, and expiry states.
 - Re-ran the complete Docker/Maven/Chromium gate successfully: 22 Maven tests passed and Playwright reported 1 passed; recorded p95 116 ms across 20 samples.
 - Merged the verified WIP branch into codex-takeover; retained the tests-pass tag.
+- Added original BolPay logo, mark, and favicon SVGs, wired the app headers and print card, documented brand rules, and selected the Noto Sans / Noto Sans Devanagari OFL system stack.
+- Added pattern-only checkout, payment confirmation, POS, and queue-board research with 10 linked references and BolPay audience-fit notes; no third-party assets were used.
+- Added a six-token bilingual static design plan and fake-data 360 px preview for customer states, vendor board, glance mode, and QR card; captured 10 screenshots. Planned features remain disabled and the live UI is unchanged.
+- Prepared split Vercel/Docker-host deployment notes, a Vercel SPA fallback rewrite, environment-variable guidance, private-service and WSS configuration, manual phone checklist, and rollback steps; no host selected or deployment performed.
+
+- Added one shared English/Hindi UI dictionary and a persistent language selector across customer, vendor, and authentication screens.
+- Rebuilt the customer amount, waiting, Verified, expired, and late-payment screens with accessible textual states and brand contrast.
+- Reworked the vendor board with state counters, icon-and-word order states, and glance mode while preserving the live update flow.
+- Rebuilt login, registration, shared form components, and the printable bilingual QR card to match the approved design.
+- Added focus, reduced-motion, responsive tap-target, and print treatments to the live UI.
+- Aligned Playwright assertions with approved “Verified” wording and scoped the paid-state check to its status element.

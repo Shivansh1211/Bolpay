@@ -9,10 +9,10 @@ const Card = ({
   ...props 
 }) => {
   const variants = {
-    default: 'bg-white border border-gray-200',
+    default: 'bg-secondary border border-gray-300',
     brand: 'bg-brand text-white',
     secondary: 'bg-secondary text-text-primary',
-    status: 'bg-gray-50',
+    status: 'bg-secondary border-y border-gray-300',
   };
   
   const paddings = {
@@ -25,10 +25,10 @@ const Card = ({
   
   const shadows = {
     none: 'shadow-none',
-    sm: 'shadow-sm',
-    md: 'shadow-md',
-    lg: 'shadow-lg',
-    xl: 'shadow-xl',
+    sm: 'shadow-none',
+    md: 'shadow-none',
+    lg: 'shadow-none',
+    xl: 'shadow-none',
   };
   
   return (

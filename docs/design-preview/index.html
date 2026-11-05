@@ -1,0 +1,144 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="color-scheme" content="light dark">
+  <title>BolPay static design preview</title>
+  <style>
+    :root { color-scheme: light; --maroon:#4A1D1F; --cream:#FFF8EC; --paying:#006B73; --paid:#17803F; --waiting:#7A4500; --line:#9A8C7D; --paper:#FFF8EC; --text:#4A1D1F; --muted:#514D46; --target:48px; font-family:"Noto Sans","Noto Sans Devanagari",system-ui,sans-serif; }
+    * { box-sizing:border-box; }
+    body { margin:0; background:#E7E0D5; color:var(--text); font-size:16px; line-height:1.45; }
+    body.dark { color-scheme:dark; --paper:#4A1D1F; --text:#FFF8EC; --muted:#E1D8CA; --line:#C8BDAE; --paid:#35C46B; --waiting:#FFF8EC; --paying:#FFF8EC; background:#4A1D1F; }
+    main { width:360px; min-height:780px; margin:0 auto; padding:16px; background:var(--paper); position:relative; overflow:hidden; }
+    .top { display:flex; align-items:center; justify-content:space-between; min-height:48px; border-bottom:2px solid var(--maroon); padding-bottom:8px; }
+    .brand { color:var(--maroon); font-size:19px; font-weight:800; letter-spacing:-.4px; }
+    body.dark .brand { color:var(--cream); }
+    .lang { min-height:48px; padding:0 10px; color:var(--text); font:inherit; background:none; border:1px solid var(--line); border-radius:4px; }
+    .screen { display:none; padding-top:24px; }
+    #amount:target, #waiting:target, #verified:target, #expired:target, #late:target, #board:target, #glance:target, #qr:target { display:block; }
+    body:not(:has(.screen:target)) #amount { display:block; }
+    h1 { font-size:22px; line-height:1.2; margin:0 0 20px; }
+    p { margin:8px 0; }
+    .label { display:block; font-size:14px; color:var(--muted); margin-bottom:4px; }
+    .amount { font-size:40px; line-height:1.15; font-weight:750; letter-spacing:-1px; padding:18px 0 24px; border-bottom:1px solid var(--line); }
+    .chips { display:flex; gap:8px; margin:16px 0 6px; }
+    .chip { min-height:48px; flex:1; background:transparent; color:var(--text); border:1px solid var(--line); border-radius:4px; font:inherit; }
+    .note { font-size:12px; color:var(--muted); }
+    .primary { width:100%; min-height:52px; margin-top:24px; background:var(--maroon); color:var(--cream); border:0; border-radius:4px; font:inherit; font-weight:700; }
+    .payee { font-size:18px; font-weight:650; padding-bottom:12px; }
+    .state { margin:0 -16px 20px; padding:18px 16px; border-block:3px solid currentColor; font-size:24px; font-weight:800; display:flex; gap:12px; align-items:center; line-height:1.1; }
+    .state .icon { width:42px; height:42px; display:grid; place-items:center; border:3px solid currentColor; flex:none; font-size:25px; }
+    .waiting-state { color:var(--paying); }
+    .waiting-state .icon { border-radius:50%; }
+    .paid-state { color:var(--paid); }
+    .paid-state .icon { border-radius:50%; }
+    .expired-state { color:var(--maroon); }
+    body.dark .expired-state { color:var(--cream); }
+    .expired-state .icon { transform:rotate(45deg); }
+    .expired-state .icon span { transform:rotate(-45deg); }
+    .late-state { color:var(--text); position:relative; }
+    .late-state .icon { clip-path:polygon(50% 0,100% 100%,0 100%); border:0; border-radius:0; background:repeating-linear-gradient(135deg,var(--text) 0 5px,var(--paper) 5px 10px); padding-top:8px; }
+    .late-state .icon span { background:var(--paper); padding:0 4px; }
+    .token-number { font-size:54px; font-weight:850; line-height:1.05; letter-spacing:2px; }
+    .rule { border-top:1px solid var(--line); margin:18px 0; }
+    .meta { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+    .meta strong { display:block; font-size:17px; }
+    .callout { margin-top:18px; border-left:4px solid var(--maroon); padding:10px 12px; background:color-mix(in srgb,var(--maroon) 9%,var(--paper)); }
+    .rows { border-top:2px solid var(--text); margin-top:12px; }
+    .counts { display:flex; justify-content:space-between; gap:5px; padding:10px 0; font-size:13px; font-weight:700; }
+    .counts span { text-align:center; }
+    .row { display:grid; grid-template-columns:50px 1fr auto; align-items:center; gap:8px; min-height:72px; padding:8px 4px; border-bottom:1px solid var(--line); border-left:5px solid var(--waiting); }
+    .row.paid { border-left-color:var(--paid); }
+    body.dark .row.paid { border-left-color:var(--paid); }
+    .row.late { border-left:5px dashed var(--text); background:repeating-linear-gradient(135deg,transparent 0 14px,color-mix(in srgb,var(--text) 7%,transparent) 14px 17px); }
+    body.dark .row.late { border-left-color:var(--cream); }
+    .row.exp { border-left-color:var(--maroon); }
+    body.dark .row.exp { border-left-color:var(--cream); }
+    .row b { font-size:20px; }
+    .row small { display:block; font-size:14px; }
+    .row strong { font-size:14px; }
+    .planned-button { display:block; width:100%; min-height:48px; margin:8px 0 2px; padding:4px 6px; border:1px dashed var(--line); background:transparent; color:var(--muted); border-radius:4px; font:inherit; line-height:1.2; }
+    .glance .state { font-size:30px; }
+    .glance .row { min-height:88px; grid-template-columns:60px 1fr auto; }
+    .glance .row b { font-size:28px; }
+    .glance .row strong { font-size:20px; }
+    .qr { width:280px; height:280px; margin:8px auto 22px; display:block; background:#fff; border:10px solid #fff; }
+    .qr-wrap { width:100%; text-align:center; }
+    .qr-label { text-align:center; font-size:20px; font-weight:750; }
+    .preview-only { display:inline-block; margin-top:10px; padding:4px 8px; border:1px dashed var(--line); font-size:12px; color:var(--muted); }
+    .vendor-line { text-align:center; margin-top:20px; border-top:1px solid var(--line); padding-top:14px; }
+    @media (prefers-reduced-motion: reduce) { *,*::before,*::after { scroll-behavior:auto !important; animation:none !important; transition:none !important; } }
+    @media print { body { background:white; } main { margin:0; } .top,.other { display:none; } #qr { display:block !important; } }
+  </style>
+  <script src="i18n.js" defer></script>
+</head>
+<body>
+<main id="preview">
+  <header class="top"><span class="brand" aria-label="BolPay">BolPay</span><button class="lang" id="lang" aria-label="Switch language">हिन्दी</button></header>
+  <section class="screen" id="amount" aria-label="Customer amount page">
+    <h1>Pay [vendor name]</h1><span class="label">Amount</span><div class="amount">₹ 0</div>
+    <div class="chips" aria-label="Quick amounts, planned"><button class="chip" disabled>₹50</button><button class="chip" disabled>₹100</button><button class="chip" disabled>₹200</button></div>
+    <p class="note">Quick amounts · planned</p><button class="primary">Continue</button>
+  </section>
+  <section class="screen" id="waiting" aria-label="Waiting for payment">
+    <h1>Payment status</h1><div class="payee">Paying [vendor name]</div>
+    <div class="state waiting-state" role="status" aria-live="polite"><span class="icon">◷</span><span>Waiting for payment</span></div>
+    <span class="label">Token</span><div class="token-number">42</div><div class="rule"></div><span class="label">Pay before</span><strong>02:30</strong>
+  </section>
+  <section class="screen" id="verified" aria-label="Payment verified">
+    <h1>Payment status</h1><div class="state paid-state" role="status" aria-live="polite"><span class="icon">✓</span><span>Verified</span></div>
+    <div class="meta"><div><span class="label">Time</span><strong>10:42 am</strong></div><div><span class="label">Reference</span><strong>BP-•••-204</strong></div></div>
+  </section>
+  <section class="screen" id="expired" aria-label="Token expired">
+    <h1>Payment status</h1><div class="state expired-state" role="status" aria-live="polite"><span class="icon"><span>×</span></span><span>Expired</span></div>
+    <p>This token has expired.</p><p>Ask the vendor for a new token.</p>
+  </section>
+  <section class="screen" id="late" aria-label="Late payment">
+    <h1>Payment status</h1><div class="state late-state" role="status" aria-live="polite"><span class="icon"><span>!</span></span><span>Late payment</span></div>
+    <div class="callout"><strong>Payment not confirmed yet.</strong><p>Wait a moment or ask the vendor to check.</p></div>
+  </section>
+  <section class="screen" id="board" aria-label="Vendor board">
+    <h1>Live orders</h1><div class="counts"><span>◷ 1 Waiting</span><span>✓ 1 Paid</span><span>△ 1 Late</span></div><div class="rows">
+      <div class="row"><b>42</b><span>₹100<small>◷ Waiting</small></span><strong>10:40</strong></div>
+      <div class="row paid"><b>43</b><span>₹80<small>✓ Paid</small><button class="planned-button" disabled>Mark as served · planned</button></span><strong>10:41</strong></div>
+      <div class="row exp"><b>44</b><span>₹60<small>× Expired</small></span><strong>10:38</strong></div>
+      <div class="row late"><b>45</b><span>₹75<small>△ Late payment</small></span><strong>10:36</strong></div>
+    </div>
+  </section>
+  <section class="screen glance" id="glance" aria-label="Vendor glance mode">
+    <h1>Live orders</h1><div class="rows">
+      <div class="row"><b>42</b><span><strong>₹100</strong></span><strong>◷ Waiting</strong></div>
+      <div class="row paid"><b>43</b><span><strong>₹80</strong></span><strong>✓ Paid</strong></div>
+      <div class="row exp"><b>44</b><span><strong>₹60</strong></span><strong>× Expired</strong></div>
+      <div class="row late"><b>44</b><span><strong>₹60</strong></span><strong>△ Late</strong></div>
+    </div>
+  </section>
+  <section class="screen" id="qr" aria-label="Printable QR card">
+    <div class="qr-wrap">
+      <svg class="qr" viewBox="0 0 29 29" role="img" aria-label="Decorative QR placeholder; replace with the vendor QR before printing" shape-rendering="crispEdges" xmlns="http://www.w3.org/2000/svg">
+        <rect width="29" height="29" fill="white"/><g fill="#4A1D1F">
+          <path d="M1 1h9v9H1zm2 2v5h5V3zm1 1h3v3H4zM19 1h9v9h-9zm2 2v5h5V3zm1 1h3v3h-3zM1 19h9v9H1zm2 2v5h5v-5zm1 1h3v3H4z"/>
+          <path d="M12 1h2v2h-2zm3 2h2v3h-2zm-4 3h3v2h-3zm4 2h3v2h-3zm-5 3h2v2h-2zm3 0h2v3h-2zm4 0h2v2h-2zm3 0h2v3h-2zm4 0h2v2h-2zm-15 3h2v2h-2zm4 1h3v2h-3zm4 1h2v2h-2zm4 0h2v3h-2zm4 0h2v2h-2zM12 19h2v2h-2zm3 1h2v2h-2zm4 0h2v2h-2zm3 1h2v2h-2zm-10 3h2v3h-2zm4 0h3v2h-3zm5 1h2v2h-2zm4-1h2v3h-2z"/>
+        </g></svg>
+      <div class="qr-label">Scan to pay BolPay</div><div lang="hi" class="qr-label">बोलपे से भुगतान करें</div>
+      <div class="vendor-line">[vendor name]</div><span class="preview-only">Static preview · sample QR only</span>
+    </div>
+  </section>
+</main>
+<script>
+  const params = new URLSearchParams(location.search);
+  if (params.get('theme') === 'dark') document.body.classList.add('dark');
+  if (params.get('mode') === 'glance') document.querySelector('#glance').classList.add('screen');
+  const toggle = document.querySelector('#lang');
+  let language = 'en';
+  toggle.addEventListener('click', () => {
+    language = language === 'en' ? 'hi' : 'en';
+    const dict = window.bolpayMessages[language];
+    document.documentElement.lang = language;
+    toggle.textContent = dict.language;
+    document.querySelector('.brand').textContent = dict.brand;
+  });
+</script>
+</body>
+</html>

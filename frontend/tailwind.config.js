@@ -9,35 +9,36 @@ export default {
       colors: {
         // Brand colours
         brand: {
-          DEFAULT: '#E63946',
-          light: '#F8D9DC',
-          dark: '#B92B36',
+          DEFAULT: '#4A1D1F',
+          light: '#FFF8EC',
+          dark: '#351416',
         },
-        secondary: '#F1FAEE',
-        accent: '#457B9D',
+        secondary: '#FFF8EC',
+        accent: '#006B73',
         
         // Status colours
         status: {
-          paying: '#F4A261',
-          paid: '#2A9D8F',
-          expired: '#E76F51',
-          late: '#9B5DE5',
+          paying: '#006B73',
+          waiting: '#7A4500',
+          paid: '#17803F',
+          expired: '#4A1D1F',
+          late: '#4A1D1F',
         },
         
         // Text colours
         text: {
-          primary: '#1D3557',
-          secondary: '#6C757D',
+          primary: '#4A1D1F',
+          secondary: '#514D46',
         },
         
         // Background colours
         bg: {
-          light: '#FFFFFF',
-          dark: '#1A1A2E',
+          light: '#FFF8EC',
+          dark: '#4A1D1F',
         },
       },
       fontFamily: {
-        sans: ['Inter', 'Poppins', 'system-ui', 'sans-serif'],
+        sans: ['Noto Sans', 'Noto Sans Devanagari', 'system-ui', 'sans-serif'],
       },
       fontSize: {
         'h1': ['32px', { lineHeight: '40px', fontWeight: '700' }],
@@ -60,6 +61,9 @@ export default {
         'md': '8px',
         'lg': '12px',
         'xl': '16px',
+      },
+      minHeight: {
+        target: '48px',
       },
       boxShadow: {
         'none': 'none',

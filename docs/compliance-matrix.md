@@ -21,8 +21,12 @@ Statuses describe repository implementation and current local test evidence; the
 | Lost webhook recovery | Tested via drop + reconciliation | `AttackSuiteTest.testLostWebhook_ReconciliationFixes`; uses mock `scenario=drop`, checks PENDING, invokes reconciliation, checks PAID; no manual status edits |
 | Voice announcement | Implemented and browser verified | `frontend/src/pages/VendorDashboard.jsx`; full Playwright gate reports voice announcement pass; `voice-pass` tag |
 | Provider-neutral deployment preparation | Prepared, not deployed | `docker-compose.production.yml`, `frontend/nginx.production.conf`, `docs/deployment-prep.md`; `deploy-prep-pass` tag |
-| Browser flow, screenshots, webhook-to-board p95 | Passed locally | `tests/e2e/specs/vendor-flow.spec.js`; `docs/test-evidence/`; 20 samples, p95 90 ms in ignored `tests/artifacts/latency.json` |
-| UI redesign | Waiting on required design approval | No redesign implementation. Create `docs/design-plan.md` and wait for approval before building |
+| Browser flow, screenshots, webhook-to-board p95 | Passed locally | `tests/e2e/specs/vendor-flow.spec.js`; `docs/test-evidence/`; latest 20 samples, p95 86 ms in ignored `tests/artifacts/latency.json` |
+| BolPay brand system | Partial; wired and documented | `frontend/public/brand/`, `frontend/index.html`, vendor headers, `VendorQRPage.jsx`, `docs/brand.md`; original SVG wordmark paths are custom geometry, not paths converted from the selected OFL font |
+| Checkout/POS/queue pattern research | Completed as pattern notes | `docs/ui-research.md`; 10 linked sources, no third-party assets copied |
+| Design plan and static preview | Approved; implementation followed approval | `docs/design-plan.md`, `docs/design-preview/`, 10 360x820 screenshots |
+| Vercel frontend routes and deployment preparation | Prepared, not deployed | `frontend/vercel.json`, `docs/deployment.md`; JSON parsed and full local runner passed |
+| UI redesign | Implemented after approval; locally verified | `frontend/src/i18n.js`, `frontend/src/pages/`, `frontend/src/index.css`; full Playwright flow in `tests/e2e/specs/vendor-flow.spec.js`; screenshots in `docs/test-evidence/` |
 | Live gateway, real-phone test, vendor survey, deployment | Not performed; manual/user work | `docs/deployment-prep.md`, `docs/limitations.md` |
 
 ## Security coverage
@@ -48,5 +52,9 @@ Statuses describe repository implementation and current local test evidence; the
 - npm reported 15 dependency audit findings (14 moderate, 1 high); they remain untriaged.
 - Live gateway/account configuration, production SMS, hosting choice, deployment, real-phone testing, and vendor survey remain outstanding.
 - Historical `step2-pass` and `step3-pass` test reruns in temporary worktrees remain optional and outstanding.
-- UI implementation remains gated on approval of a design plan.
+- No quick-amount chips or Mark-as-served action; both remain planned preview examples.
+- Public registration invite-code enforcement is not implemented; setting `INVITE_CODE` would have no effect.
+- The outlined logo was hand-drawn as original vector geometry, not converted from the selected Noto Sans font; the OFL type pairing is documented and used as the live text stack.
+- Dedicated cold-start “Waking up the server…” messaging/retry behavior is not implemented; current app uses generic loading states.
+- Production SMS delivery, hosting selection, real-phone checks, and vendor survey remain outstanding.
 - Local mock tests do not prove production security and do not establish scam prevention.

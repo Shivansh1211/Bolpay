@@ -158,18 +158,18 @@ test('scan, pending, verified payment, and abandoned order lifecycle', async ({ 
   const primaryOrderHttpResponse = await primaryOrderResponse;
   if (!primaryOrderHttpResponse.ok()) throw new Error('Customer order creation failed.');
   const primaryOrder = await primaryOrderHttpResponse.json();
-  await expect(customer.getByText('Your token')).toBeVisible();
+  await expect(customer.getByText('Token', { exact: true })).toBeVisible();
   await expect(customer.getByText('₹23.5')).toBeVisible();
-  await customer.addStyleTag({ content: '.tracking-widest { display: none !important; }' });
+  await customer.addStyleTag({ content: '.token-value { visibility: hidden !important; }' });
   await customer.screenshot({ path: path.join(screenshotDir, '05-customer-token-redacted.png'), fullPage: true });
 
   await dashboard.reload();
   const pendingRow = dashboard.getByTestId(`pending-order-${primaryOrder.id}`);
   await expect(pendingRow).toBeVisible();
-  await expect(pendingRow.getByText('Paying')).toBeVisible();
-  const amberBorder = await pendingRow.locator('.border-status-paying').evaluate((element) => getComputedStyle(element).borderTopColor);
-  expect(amberBorder).toBe('rgb(244, 162, 97)');
-  await dashboard.addStyleTag({ content: 'span.tracking-widest { display: none !important; }' });
+  await expect(pendingRow.getByText('Waiting')).toBeVisible();
+  const amberBorder = await pendingRow.locator('.order-row').evaluate((element) => getComputedStyle(element).borderLeftColor);
+  expect(amberBorder).toBe('rgb(122, 69, 0)');
+  await dashboard.addStyleTag({ content: '.order-token { visibility: hidden !important; }' });
   await dashboard.screenshot({ path: path.join(screenshotDir, '06-vendor-pending-amber.png'), fullPage: true });
 
   await customer.getByRole('button', { name: 'Open UPI app' }).click();
@@ -192,8 +192,8 @@ test('scan, pending, verified payment, and abandoned order lifecycle', async ({ 
   if (!paidStatusResponse.ok() || (await paidStatusResponse.json()).status !== 'PAID') {
     throw new Error('Mock checkout did not result in a server-confirmed paid order.');
   }
-  await expect(checkout.getByRole('heading', { name: 'Payment verified' })).toBeVisible({ timeout: 8_000 });
-  await expect(customer.getByRole('heading', { name: 'Payment verified' })).toBeVisible({ timeout: 8_000 });
+  await expect(checkout.getByRole('heading', { name: 'Verified' })).toBeVisible({ timeout: 8_000 });
+  await expect(customer.getByRole('heading', { name: 'Verified' })).toBeVisible({ timeout: 8_000 });
   await dashboard.waitForFunction((orderId) => Boolean(document.querySelector(`[data-testid="paid-order-${orderId}"]`)),
     primaryOrder.id, { timeout: 8_000 }).catch(async () => {
       const boardResponse = await api.get('/api/vendor/board', {
@@ -205,12 +205,12 @@ test('scan, pending, verified payment, and abandoned order lifecycle', async ({ 
     });
   const paidRow = dashboard.getByTestId(`paid-order-${primaryOrder.id}`);
   await expect(paidRow).toBeVisible();
-  await expect(paidRow.getByText('Paid')).toBeVisible();
-  const greenBorder = await paidRow.locator('.border-status-paid').evaluate((element) => getComputedStyle(element).borderTopColor);
-  expect(greenBorder).toBe('rgb(42, 157, 143)');
-  await dashboard.addStyleTag({ content: 'span.tracking-widest { display: none !important; }' });
+  await expect(paidRow.locator('.order-state--paid')).toBeVisible();
+  const greenBorder = await paidRow.locator('.order-row').evaluate((element) => getComputedStyle(element).borderLeftColor);
+  expect(greenBorder).toBe('rgb(23, 128, 63)');
+  await dashboard.addStyleTag({ content: '.order-token { visibility: hidden !important; }' });
   await dashboard.screenshot({ path: path.join(screenshotDir, '08-vendor-paid-green.png'), fullPage: true });
-  await customer.addStyleTag({ content: 'div[class*="bg-status-paid"] p:nth-child(n+2) { display: none !important; }' });
+  await customer.addStyleTag({ content: '.token-value, dd.break-all { visibility: hidden !important; }' });
   await customer.screenshot({ path: path.join(screenshotDir, '09-customer-verified.png'), fullPage: true });
 
   for (let index = 0; index < 20; index++) {
@@ -243,7 +243,7 @@ test('scan, pending, verified payment, and abandoned order lifecycle', async ({ 
   const abandonedOrderHttpResponse = await abandonedOrderResponse;
   if (!abandonedOrderHttpResponse.ok()) throw new Error('Abandoned order creation failed.');
   const abandonedOrder = await abandonedOrderHttpResponse.json();
-  await expect(customer.getByText('Your token')).toBeVisible();
+  await expect(customer.getByText('Token', { exact: true })).toBeVisible();
   await dashboard.reload();
   const abandonedPendingRow = dashboard.getByTestId(`pending-order-${abandonedOrder.id}`);
   await expect(abandonedPendingRow).toBeVisible();
@@ -262,8 +262,8 @@ test('scan, pending, verified payment, and abandoned order lifecycle', async ({ 
   const expiredRow = dashboard.getByTestId(`all-order-${abandonedOrder.id}`);
   await expect(expiredRow.getByText('Expired')).toBeVisible({ timeout: 12_000 });
   expect(abandonWebhookRequests).toBe(0);
-  const redBorder = await expiredRow.locator('.border-status-expired').evaluate((element) => getComputedStyle(element).borderTopColor);
-  expect(redBorder).toBe('rgb(231, 111, 81)');
-  await dashboard.addStyleTag({ content: 'span.tracking-widest { display: none !important; }' });
+  const redBorder = await expiredRow.locator('.order-row').evaluate((element) => getComputedStyle(element).borderLeftColor);
+  expect(redBorder).toBe('rgb(74, 29, 31)');
+  await dashboard.addStyleTag({ content: '.order-token { visibility: hidden !important; }' });
   await dashboard.screenshot({ path: path.join(screenshotDir, '10-vendor-abandoned-red.png'), fullPage: true });
 });

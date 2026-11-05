@@ -6,8 +6,11 @@
 - `AttackSuiteTest.otpIsNotReturnedToClientByDefault` verifies the default API response and captured logs. Local E2E explicitly enables development OTP behavior for test registration.
 - STOMP authentication and vendor topic isolation are verified locally over a signed JWT connection. This does not provide load, browser compatibility, or production infrastructure validation.
 - Duplicate webhook handling is not exercised under concurrent delivery, and emitted WebSocket announcement counts are not asserted.
-- Playwright covers the mock flow, live board updates, voice, and scheduled expiry. It is not a real-phone or live-provider test. The measured local webhook-received-to-board-DOM p95 was 90 ms across 20 samples; this is not a production performance guarantee.
+- Playwright covers the mock flow, live board updates, voice, and scheduled expiry. It is not a real-phone or live-provider test. The latest measured local webhook-received-to-board-DOM p95 was 82 ms across 20 samples; this is not a production performance guarantee.
 - No hosting provider has been selected and no deployment has occurred.
-- UI redesign has not started. Prepare `docs/design-plan.md` and wait for approval before implementation.
+- The user approved the design plan on 2026-11-05 and the live UI redesign is implemented. Quick amount and Mark as served remain preview-only examples.
+- The logo wordmark is original hand-drawn SVG path geometry, not a conversion of the selected OFL typeface to outlines.
+- Registration has no `INVITE_CODE` server-side gate; setting an environment variable with that name currently has no effect.
+- A dedicated “Waking up the server…” state and safe retry/backoff behavior for sleeping hosts are not implemented.
 - Frontend npm audit reported 15 findings (14 moderate, 1 high); they remain untriaged.
 - The prototype is not production-ready and does not claim to prevent scams.

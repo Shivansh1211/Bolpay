@@ -1,20 +1,8 @@
-Safe excerpt from the actual successful run of `pwsh -NoProfile -File tests/run-all.ps1` on the current workspace. Full unredacted output is kept in ignored `tests/artifacts/post-merge-run-output.txt`.
+Safe excerpt from the actual final UI successful run of `pwsh -NoProfile -File tests/run-all.ps1` (exit code 0). Full raw output is stored in ignored `tests/artifacts/ui-final-output.txt`.
 
 ```text
-== Docker Compose configuration ==
-PASS: docker compose config
-== Production Compose template configuration ==
-PASS: provider-neutral production Compose template config (dummy validation values only)
-PASS: production frontend/Nginx image build
-== Build and start services ==
-== Backend tests using disposable PostgreSQL ==
-[INFO] Tests run: 2, Failures: 0, Errors: 0, Skipped: 0 -- OrderTokenAllocationTest
-[INFO] Tests run: 16, Failures: 0, Errors: 0, Skipped: 0 -- AttackSuiteTest
-[INFO] Tests run: 2, Failures: 0, Errors: 0, Skipped: 0 -- WebSocketSecurityConfigTest
-[INFO] Tests run: 2, Failures: 0, Errors: 0, Skipped: 0 -- WebSocketStompIntegrationTest
 [INFO] Tests run: 22, Failures: 0, Errors: 0, Skipped: 0
 [INFO] BUILD SUCCESS
-== Docker/API smoke tests ==
 PASS: temporary PostgreSQL started with no persisted volume.
 PASS: backend started with PAYMENT_GATEWAY=mock.
 PASS: Flyway applied V1-V7 successfully to an empty database.
@@ -23,15 +11,15 @@ PASS: nginx returns 404 for /mock-admin and /admin/attack/... .
 STEP 1 SMOKE TESTS PASSED.
 == Playwright browser and webhook-to-board tests ==
 Running 1 test using 1 worker
-  1 passed (21.6s)
+  1 passed (14.2s)
 PASS: Playwright customer flow, vendor live board, voice announcement, screenshots, and webhook latency samples
 ALL TESTS PASSED.
 ```
 
-Actual final lines shown by the runner:
+The exact final lines emitted by the runner were:
 
 ```text
-1 passed (21.6s)
+  1 passed (14.2s)
 PASS: Playwright customer flow, vendor live board, voice announcement, screenshots, and webhook latency samples
 ALL TESTS PASSED.
 ```

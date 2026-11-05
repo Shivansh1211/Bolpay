@@ -9,8 +9,8 @@ const Input = ({
   className = '',
   ...props 
 }) => {
-  const baseStyles = 'w-full px-4 py-3 border-2 rounded-sm focus:outline-none focus:ring-2 focus:ring-brand focus:border-transparent transition-all text-body bg-white';
-  const errorStyles = error ? 'border-status-expired focus:ring-status-expired' : 'border-gray-200';
+  const baseStyles = 'w-full min-h-target px-4 py-3 border rounded-sm focus:outline-none focus:ring-2 focus:ring-brand focus:border-transparent text-body bg-secondary';
+  const errorStyles = error ? 'border-status-expired focus:ring-status-expired' : 'border-gray-500';
   
   return (
     <div className="space-y-1">

@@ -5,10 +5,10 @@ import { connectWebSocket, disconnectWebSocket } from '../services/websocket';
 import { orderAPI } from '../services/api';
 import Button from '../components/Button';
 import Card from '../components/Card';
-import StatusBadge from '../components/StatusBadge';
+import { LanguageSelect, useTranslation } from '../i18n';
 
 // OrderRow component for color-coded order rows
-const OrderRow = ({ order, type }) => {
+const OrderRow = ({ order, type, t }) => {
   const [timeLeft, setTimeLeft] = useState(0);
 
   useEffect(() => {
@@ -26,42 +26,19 @@ const OrderRow = ({ order, type }) => {
     }
   }, [order.expiresAt, type]);
 
-  const getRowStyle = () => {
-    if (type === 'pending') return 'bg-status-paying/10 border-status-paying';
-    if (order.status === 'PAID') return 'bg-status-paid/10 border-status-paid';
-    if (order.status === 'EXPIRED') return 'bg-status-expired/10 border-status-expired';
-    if (order.status === 'LATE_PAID') return 'bg-status-late/10 border-status-late';
-    return 'bg-gray-50 border-gray-200';
-  };
+  const status = type === 'pending' ? 'PENDING' : order.status;
+  const state = status === 'PAID' ? 'paid' : status === 'EXPIRED' ? 'expired' : status === 'LATE_PAID' || status === 'FLAGGED' ? 'late' : 'waiting';
+  const icon = state === 'paid' ? '✓' : state === 'expired' ? '×' : state === 'late' ? '△' : '◷';
+  const label = state === 'paid' ? t('paid') : state === 'expired' ? t('expired') : state === 'late' ? t('latePayment') : t('waiting');
+  const time = type === 'pending' ? t('timeLeft', { time: `${timeLeft}s` })
+    : order.paidAt ? t('paidAt', { time: new Date(order.paidAt).toLocaleTimeString() })
+      : order.createdAt ? new Date(order.createdAt).toLocaleTimeString() : '';
 
   return (
-    <div className={`p-4 rounded-sm border-2 shadow-sm ${getRowStyle()} transition-all hover:shadow-md`}>
-      <div className="flex justify-between items-center">
-        <div className="flex-1">
-          <div className="flex items-center gap-3 mb-2">
-            <span className="text-h2 font-bold text-text-primary tracking-widest">{order.token}</span>
-            <span className="text-h3 font-bold text-text-secondary">•</span>
-            <span className="text-h3 font-bold text-text-primary">₹{order.amount}</span>
-          </div>
-          {type === 'pending' && (
-            <div className="flex items-center gap-2 text-status-paying font-semibold text-small">
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
-              <span>{timeLeft}s remaining</span>
-            </div>
-          )}
-          {order.paidAt && (
-            <div className="flex items-center gap-2 text-text-secondary text-small">
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-              </svg>
-              <span>{new Date(order.paidAt).toLocaleTimeString()}</span>
-            </div>
-          )}
-        </div>
-        <StatusBadge status={order.status === 'LATE_PAID' ? 'LATE_PAID' : (type === 'pending' ? 'PENDING' : order.status)} />
-      </div>
+    <div className={`order-row order-row--${state}`} role="listitem" aria-label={`${t('token')} ${order.token}, ₹${order.amount}, ${label}`}>
+      <span className="order-token">{order.token}</span>
+      <span className="order-details"><span className="order-amount">₹{order.amount}</span><br /><span className={`order-state order-state--${state}`} aria-live="polite"><span aria-hidden="true">{icon}</span>{label}</span></span>
+      <span className="order-time">{time}</span>
     </div>
   );
 };
@@ -80,7 +57,7 @@ const VendorDashboard = () => {
   const [showPaymentAlert, setShowPaymentAlert] = useState(false);
   const [quickCheckToken, setQuickCheckToken] = useState('');
   const [quickCheckResult, setQuickCheckResult] = useState(null);
-  const [language, setLanguage] = useState('en'); // 'en' or 'hi'
+  const { language, setLanguage, t } = useTranslation();
   const [voiceEnabled, setVoiceEnabled] = useState(() => localStorage.getItem('voiceAnnouncements') === 'true');
   const [glanceMode, setGlanceMode] = useState(false);
   const [scanCount, setScanCount] = useState(0);
@@ -180,15 +157,20 @@ const VendorDashboard = () => {
       const data = await response.json();
       setQuickCheckResult(data);
     } catch (err) {
-      setQuickCheckResult({ found: false, message: 'Order not found' });
+      setQuickCheckResult({ found: false, message: t('notFound') });
     }
   };
 
+  const lateCount = (boardData?.allOrders || []).filter((order) => order.status === 'LATE_PAID' || order.status === 'FLAGGED').length;
+  const quickCheckLabel = quickCheckResult?.status === 'PAID' ? t('paid')
+    : quickCheckResult?.status === 'EXPIRED' ? t('expired')
+      : quickCheckResult?.status === 'LATE_PAID' ? t('latePayment') : t('waiting');
+
   return (
-    <div className="min-h-screen bg-secondary">
+    <div className="app-shell">
       {/* Payment Alert Overlay */}
       {showPaymentAlert && recentPayment && (
-        <div className="fixed inset-0 bg-brand flex items-center justify-center z-50 animate-pulse-slow">
+        <div className="fixed inset-0 bg-brand flex items-center justify-center z-50" role="status" aria-live="assertive">
           <div className="text-center text-white">
             <div className="w-24 h-24 bg-white/20 rounded-sm flex items-center justify-center mx-auto mb-4">
               <svg className="w-16 h-16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -196,99 +178,52 @@ const VendorDashboard = () => {
               </svg>
             </div>
             <h1 className="text-6xl font-bold mb-2">₹{recentPayment.amount}</h1>
-            <p className="text-h2 font-semibold mb-2">Unusual payment detected</p>
-            <p className="text-body opacity-80">Order: {recentPayment.orderCode}</p>
+            <p className="text-h2 font-semibold mb-2">{t('latePayment')}</p>
+            <p className="text-body opacity-80">{t('notConfirmedYet')}</p>
           </div>
         </div>
       )}
 
       {/* Header */}
-      <div className="bg-brand border-b-4 border-brand-dark shadow-md">
-        <div className="max-w-7xl mx-auto px-4 py-4 flex justify-between items-center">
+      <header className="app-header">
+        <div className="app-header-inner">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-white rounded-sm flex items-center justify-center">
-              <span className="text-brand font-bold text-lg">B</span>
-            </div>
+            <img src="/brand/bolpay-mark.svg" alt="" aria-hidden="true" className="h-10 w-10" />
             <div>
-              <h1 className="text-h2 font-bold text-white">BolPay</h1>
-              <p className="text-white/80 text-small">Vendor board</p>
+              <h1 className="m-0 text-base font-bold text-white">{t('brand')}</h1>
+              <p className="text-white/80 text-small">{t('vendorBoard')}</p>
             </div>
           </div>
           <div className="flex items-center gap-2">
-            <label className="sr-only" htmlFor="voice-language">Announcement language</label>
-            <select
-              id="voice-language"
-              aria-label="Announcement language"
-              value={language}
-              onChange={(event) => setLanguage(event.target.value)}
-              className="rounded-sm px-2 py-2 text-sm text-text-primary"
-            >
-              <option value="en">English</option>
-              <option value="hi">हिन्दी</option>
-            </select>
+            <LanguageSelect language={language} setLanguage={setLanguage} />
             <Button variant="secondary" size="sm" onClick={toggleVoiceAnnouncements} aria-pressed={voiceEnabled}>
-              Voice {voiceEnabled ? 'On' : 'Off'}
+              Voice {voiceEnabled ? t('on') : t('off')}
             </Button>
-            <Button variant="secondary" size="sm" onClick={handleLogout}>Logout</Button>
+            <Button variant="secondary" size="sm" onClick={handleLogout}>{t('logout')}</Button>
           </div>
         </div>
-      </div>
+      </header>
 
-      <div className="max-w-7xl mx-auto px-4 py-6">
-        {/* Stats Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-          <Card variant="brand" padding="md" shadow="md" className="text-white">
-            <div className="flex items-center justify-between mb-3">
-              <div className="w-10 h-10 bg-white/20 rounded-sm flex items-center justify-center">
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                </svg>
-              </div>
-              <span className="text-white/80 text-small">Scanned</span>
-            </div>
-            <p data-testid="scan-count" className="text-5xl font-bold mb-1">{scanCount}</p>
-            <p className="text-white/80 text-tiny">Customers today</p>
-          </Card>
-
-          <Card variant="status" padding="md" shadow="md" className="border-l-4 border-status-paying">
-            <div className="flex items-center justify-between mb-3">
-              <div className="w-10 h-10 bg-status-paying/20 rounded-sm flex items-center justify-center">
-                <svg className="w-5 h-5 text-status-paying" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-              </div>
-              <span className="text-text-secondary text-small">Paying now</span>
-            </div>
-            <p className="text-5xl font-bold mb-1 text-status-paying">{boardData?.payingNow || 0}</p>
-            <p className="text-text-secondary text-tiny">Active payments</p>
-          </Card>
-
-          <Card variant="status" padding="md" shadow="md" className="border-l-4 border-status-paid">
-            <div className="flex items-center justify-between mb-3">
-              <div className="w-10 h-10 bg-status-paid/20 rounded-sm flex items-center justify-center">
-                <svg className="w-5 h-5 text-status-paid" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-              </div>
-              <span className="text-text-secondary text-small">Paid (10 min)</span>
-            </div>
-            <p className="text-5xl font-bold mb-1 text-status-paid">{boardData?.paidLast10Min || 0}</p>
-            <p className="text-text-secondary text-tiny">Completed payments</p>
-          </Card>
+      <main className="page-width py-6">
+        <div className="board-counters" aria-label={t('orders')}>
+          <div className="board-counter"><span className="board-counter-label"><span aria-hidden="true">◉</span>{t('scanned')}</span><span data-testid="scan-count" className="board-counter-value">{scanCount}</span><span className="text-tiny text-text-secondary">{t('customersToday')}</span></div>
+          <div className="board-counter"><span className="board-counter-label"><span aria-hidden="true">◷</span>{t('payingNow')}</span><span className="board-counter-value">{boardData?.waitingOrders?.length || 0}</span><span className="text-tiny text-text-secondary">{t('activePayments')}</span></div>
+          <div className="board-counter"><span className="board-counter-label"><span aria-hidden="true">✓</span>{t('paidTenMinutes')}</span><span className="board-counter-value">{boardData?.paidOrders?.length || 0}</span><span className="text-tiny text-text-secondary">{t('completedPayments')}</span></div>
+          <div className="board-counter"><span className="board-counter-label"><span aria-hidden="true">△</span>{t('latePayment')}</span><span className="board-counter-value">{lateCount}</span><span className="text-tiny text-text-secondary">{t('orders')}</span></div>
         </div>
 
         {/* Quick Actions */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
           <Card variant="default" padding="md" shadow="md">
-            <h2 className="text-h3 font-bold text-text-primary mb-4">Quick check</h2>
+            <h2 className="section-heading">{t('quickCheck')}</h2>
             <form onSubmit={handleQuickCheck} className="flex gap-3">
               <input
                 type="text"
+                aria-label={t('enterToken')}
                 value={quickCheckToken}
                 onChange={(e) => setQuickCheckToken(e.target.value.toUpperCase())}
-                placeholder="Enter token (e.g., K72)"
-                className="flex-1 px-4 py-3 border-2 border-gray-200 rounded-sm focus:outline-none focus:ring-2 focus:ring-brand focus:border-transparent uppercase font-bold text-lg"
+                placeholder={t('enterToken')}
+                className="field-input flex-1 uppercase font-bold"
                 maxLength={4}
               />
               <Button
@@ -296,41 +231,16 @@ const VendorDashboard = () => {
                 variant="primary"
                 size="md"
               >
-                Check
+                {t('check')}
               </Button>
             </form>
 
             {quickCheckResult && (
-              <div className={`mt-4 p-4 rounded-sm border-2 ${
-                quickCheckResult.found
-                  ? quickCheckResult.status === 'PAID'
-                    ? 'bg-status-paid/10 border-status-paid'
-                    : quickCheckResult.status === 'EXPIRED'
-                    ? 'bg-status-expired/10 border-status-expired'
-                    : 'bg-status-paying/10 border-status-paying'
-                  : 'bg-gray-50 border-gray-200'
-              }`}>
+              <div className={`mt-4 border-l-4 p-4 ${quickCheckResult.found ? `order-row--${quickCheckResult.status === 'PAID' ? 'paid' : quickCheckResult.status === 'EXPIRED' ? 'expired' : quickCheckResult.status === 'LATE_PAID' ? 'late' : 'waiting'}` : 'border-status-expired'}`} role="status" aria-live="polite">
                 {quickCheckResult.found ? (
                   <div className="text-center">
-                    <p className="text-5xl font-bold mb-2 tracking-widest">
-                      <span className={
-                        quickCheckResult.status === 'PAID' ? 'text-status-paid' :
-                        quickCheckResult.status === 'EXPIRED' ? 'text-status-expired' :
-                        'text-status-paying'
-                      }>
-                        {quickCheckResult.token}
-                      </span>
-                    </p>
-                    <p className="text-h2 font-bold mb-1">
-                      <span className={
-                        quickCheckResult.status === 'PAID' ? 'text-status-paid' :
-                        quickCheckResult.status === 'EXPIRED' ? 'text-status-expired' :
-                        'text-status-paying'
-                      }>
-                        {quickCheckResult.status}
-                      </span>
-                    </p>
-                    <p className="text-h3 text-text-primary">₹{quickCheckResult.amount}</p>
+                    <p className="token-value">{quickCheckResult.token}</p>
+                    <p className="section-heading">{quickCheckLabel}: ₹{quickCheckResult.amount}</p>
                   </div>
                 ) : (
                   <p className="text-status-expired font-semibold text-center">{quickCheckResult.message}</p>
@@ -340,16 +250,16 @@ const VendorDashboard = () => {
           </Card>
 
           <Card variant="default" padding="md" shadow="md">
-            <h2 className="text-h3 font-bold text-text-primary mb-4">Quick actions</h2>
+            <h2 className="section-heading">{t('quickActions')}</h2>
             <div className="grid grid-cols-2 gap-3">
               <button
                 onClick={() => navigate('/vendor/qr')}
-                className="flex flex-col items-center gap-2 p-4 bg-status-paying/10 border-2 border-status-paying rounded-sm hover:bg-status-paying/20 transition-all"
+                className="flex min-h-target flex-col items-center gap-2 border border-brand bg-secondary p-4 text-brand transition-colors hover:bg-brand-light"
               >
                 <svg className="w-8 h-8 text-status-paying" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm12 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z" />
                 </svg>
-                <span className="font-semibold text-text-primary text-small">Print QR card</span>
+                <span className="font-semibold text-text-primary text-small">{t('printQr')}</span>
               </button>
               <button
                 onClick={() => setGlanceMode(!glanceMode)}
@@ -363,7 +273,7 @@ const VendorDashboard = () => {
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
                 </svg>
-                <span className="font-semibold text-small">{glanceMode ? 'Exit glance' : 'Glance mode'}</span>
+                <span className="font-semibold text-small">{glanceMode ? t('exitGlance') : t('glanceMode')}</span>
               </button>
             </div>
           </Card>
@@ -374,24 +284,24 @@ const VendorDashboard = () => {
           <>
             {/* Paying Now */}
             <Card data-testid="recent-paid-orders" variant="default" padding="md" shadow="md" className="mb-4">
-              <h2 className="text-h3 font-bold text-text-primary mb-4 flex items-center gap-2">
+              <h2 className="section-heading flex items-center gap-2">
                 <svg className="w-5 h-5 text-status-paying" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                 </svg>
-                Paying now ({boardData?.waitingOrders?.length || 0})
+                {t('waiting')} ({boardData?.waitingOrders?.length || 0})
               </h2>
               {boardData?.waitingOrders?.length === 0 ? (
                 <div className="text-center py-8 text-text-secondary">
                   <svg className="w-12 h-12 mx-auto mb-3 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                   </svg>
-                  <p className="text-body">No active payments</p>
+                  <p className="text-body">{t('noActivePayments')}</p>
                 </div>
               ) : (
-                <div className="space-y-3">
+                <div className="order-list" role="list">
                   {(boardData?.waitingOrders || []).map((order) => (
                     <div key={order.id} data-testid={`pending-order-${order.id}`}>
-                      <OrderRow order={order} type="pending" />
+                      <OrderRow order={order} type="pending" t={t} />
                     </div>
                   ))}
                 </div>
@@ -400,24 +310,24 @@ const VendorDashboard = () => {
 
             {/* Recent Payments */}
             <Card variant="default" padding="md" shadow="md" className="mb-4">
-              <h2 className="text-h3 font-bold text-text-primary mb-4 flex items-center gap-2">
+              <h2 className="section-heading flex items-center gap-2">
                 <svg className="w-5 h-5 text-status-paid" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                 </svg>
-                Paid (10 min) ({boardData?.paidOrders?.length || 0})
+                {t('paidTenMinutes')} ({boardData?.paidOrders?.length || 0})
               </h2>
               {boardData?.paidOrders?.length === 0 ? (
                 <div className="text-center py-8 text-text-secondary">
                   <svg className="w-12 h-12 mx-auto mb-3 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                   </svg>
-                  <p className="text-body">No recent payments</p>
+                  <p className="text-body">{t('noRecentPayments')}</p>
                 </div>
               ) : (
-                <div className="space-y-3">
+                <div className="order-list" role="list">
                   {(boardData?.paidOrders || []).map((order, index) => (
                     <div key={order.id} data-testid={`paid-order-${order.id}`} className={index < 3 ? 'ring-2 ring-status-paid rounded-sm' : ''}>
-                      <OrderRow order={order} type="paid" />
+                      <OrderRow order={order} type="paid" t={t} />
                     </div>
                   ))}
                 </div>
@@ -426,24 +336,24 @@ const VendorDashboard = () => {
 
             {/* All Orders */}
             <Card variant="default" padding="md" shadow="md">
-              <h2 className="text-h3 font-bold text-text-primary mb-4 flex items-center gap-2">
+              <h2 className="section-heading flex items-center gap-2">
                 <svg className="w-5 h-5 text-accent" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
                 </svg>
-                All orders ({boardData?.allOrders?.length || 0})
+                {t('allOrders')} ({boardData?.allOrders?.length || 0})
               </h2>
               {boardData?.allOrders?.length === 0 ? (
                 <div className="text-center py-8 text-text-secondary">
                   <svg className="w-12 h-12 mx-auto mb-3 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
                   </svg>
-                  <p className="text-body">No orders yet</p>
+                  <p className="text-body">{t('noRecentPayments')}</p>
                 </div>
               ) : (
-                <div className="space-y-3">
+                <div className="order-list" role="list">
                   {(boardData?.allOrders || []).map((order) => (
                     <div key={order.id} data-testid={`all-order-${order.id}`}>
-                      <OrderRow order={order} type="all" />
+                      <OrderRow order={order} type="all" t={t} />
                     </div>
                   ))}
                 </div>
@@ -454,36 +364,21 @@ const VendorDashboard = () => {
 
         {/* Glance Mode - Simplified View */}
         {glanceMode && (
-          <div className="bg-bg-dark text-white rounded-sm shadow-xl p-8 min-h-screen">
-            <h1 className="text-h2 font-bold mb-6 text-center opacity-80">Glance mode</h1>
-            <div className="grid grid-cols-2 gap-6 mb-8">
-              <div className="text-center">
-                <p className="text-6xl font-bold text-status-paying">{boardData?.payingNow || 0}</p>
-                <p className="text-h3 opacity-80">Paying now</p>
-              </div>
-              <div className="text-center">
-                <p className="text-6xl font-bold text-status-paid">{boardData?.paidLast10Min || 0}</p>
-                <p className="text-h3 opacity-80">Paid (10 min)</p>
-              </div>
+          <section className="glance-board" aria-label={t('glanceMode')}>
+            <h2 className="section-heading">{t('glanceMode')}</h2>
+            <div className="board-counters">
+              <div className="board-counter"><span className="board-counter-label">◷ {t('waiting')}</span><span className="board-counter-value">{boardData?.waitingOrders?.length || 0}</span></div>
+              <div className="board-counter"><span className="board-counter-label">✓ {t('paid')}</span><span className="board-counter-value">{boardData?.paidOrders?.length || 0}</span></div>
+              <div className="board-counter"><span className="board-counter-label">× {t('expired')}</span><span className="board-counter-value">{(boardData?.allOrders || []).filter((order) => order.status === 'EXPIRED').length}</span></div>
+              <div className="board-counter"><span className="board-counter-label">△ {t('latePayment')}</span><span className="board-counter-value">{lateCount}</span></div>
             </div>
-            <div className="space-y-4">
-              <h2 className="text-h3 font-bold mb-4 opacity-80">Recent paid</h2>
-              {boardData?.paidOrders?.slice(0, 3).map((order) => (
-                <div key={order.id} className="flex justify-between items-center text-5xl py-3 border-b border-white/10">
-                  <span className="text-status-paid font-bold tracking-widest">{order.token}</span>
-                  <span className="opacity-80">₹{order.amount}</span>
-                </div>
-              ))}
-              {(!boardData?.paidOrders || boardData.paidOrders.length === 0) && (
-                <p className="text-center text-h3 opacity-50 py-8">No recent payments</p>
-              )}
+            <div className="order-list" role="list">
+              {(boardData?.allOrders || []).map((order) => <OrderRow key={order.id} order={order} type="all" t={t} />)}
+              {boardData?.allOrders?.length === 0 && <p className="py-8 text-center">{t('noRecentPayments')}</p>}
             </div>
-            <div className="mt-8 text-center">
-              <p className="text-tiny opacity-50">Tap anywhere to exit</p>
-            </div>
-          </div>
+          </section>
         )}
-      </div>
+      </main>
     </div>
   );
 };

@@ -1,10 +1,12 @@
 import React from 'react';
+import { useTranslation } from '../i18n';
 
 const StatusBadge = ({ status, size = 'md' }) => {
+  const { t } = useTranslation();
   const statusConfig = {
     PENDING: {
-      colour: 'bg-status-paying',
-      text: 'Paying',
+      colour: 'status-badge--waiting',
+      text: t('waiting'),
       icon: (
         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
@@ -12,8 +14,8 @@ const StatusBadge = ({ status, size = 'md' }) => {
       ),
     },
     PAID: {
-      colour: 'bg-status-paid',
-      text: 'Paid',
+      colour: 'status-badge--paid',
+      text: t('paid'),
       icon: (
         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
@@ -21,8 +23,8 @@ const StatusBadge = ({ status, size = 'md' }) => {
       ),
     },
     EXPIRED: {
-      colour: 'bg-status-expired',
-      text: 'Expired',
+      colour: 'status-badge--expired',
+      text: t('expired'),
       icon: (
         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -30,8 +32,8 @@ const StatusBadge = ({ status, size = 'md' }) => {
       ),
     },
     LATE_PAID: {
-      colour: 'bg-status-late',
-      text: 'Late',
+      colour: 'status-badge--late',
+      text: t('latePayment'),
       icon: (
         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
@@ -49,7 +51,7 @@ const StatusBadge = ({ status, size = 'md' }) => {
   };
 
   return (
-    <span className={`inline-flex items-center gap-1.5 rounded-sm ${config.colour} text-white ${sizes[size]}`}>
+    <span className={`status-badge inline-flex items-center gap-1.5 ${config.colour} ${sizes[size]}`}>
       {config.icon}
       {config.text}
     </span>

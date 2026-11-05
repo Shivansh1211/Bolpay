@@ -5,5 +5,6 @@ COPY package.json ./
 RUN npm install
 COPY playwright.config.js ./
 COPY specs ./specs
+COPY capture-design-preview.mjs ./
 
 CMD ["npm", "test"]
