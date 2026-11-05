@@ -3,7 +3,7 @@
 ## Current state
 
 - Branch: `codex-takeover` (WIP merged from `codex/wip-playwright-evidence`). Tags `step2-pass`, `step3-pass`, `voice-pass`, `deploy-prep-pass`, and `tests-pass` are present.
-- Tasks 1–5 of the current phase are complete, and the user approved the design plan and preview on 2026-11-05. The approved live UI redesign is implemented and the full gate passed; see “UI implementation after approval” below.
+- The approved UI redesign and the five newly requested gap-closing tasks are complete; full gate passed after each task. Details and exact evidence are recorded in the sections below.
 - No migration or database volume was edited/deleted.
 
 ## WebSocket reproduction and root cause
@@ -90,7 +90,7 @@ The final full output is in ignored `tests/artifacts/final-run-output.txt`; the 
 
 - Added `docs/deployment.md` with provider categories (none selected), Vercel setup, environment variables, HTTPS SockJS/WSS proxying, strict CORS, private ML/database guidance, mock admin password handling, cold-start limitations, real-phone checklist, and rollback steps.
 - Added `frontend/vercel.json` SPA fallback rewrite for Vite routes including `/v/{slug}` and `/o/{code}`.
-- Recorded gaps accurately: `INVITE_CODE` is not implemented; SMS delivery and dedicated “Waking up the server…” behavior are absent. The production Compose template omits the mock service.
+- At that stage, `INVITE_CODE` was not yet implemented; a later gap-closing task added the optional registration gate. SMS delivery and dedicated “Waking up the server…” behavior remain absent. The production Compose template omits the mock service.
 - `frontend/vercel.json` parsed successfully and contains one catch-all rewrite to `/index.html`.
 - Verified with `pwsh -NoProfile -File tests/run-all.ps1` (exit 0): Compose and production image builds passed; Maven 22 tests, 0 failures/errors/skips; Docker/API smoke checks passed; Playwright 1 passed in 20.5s. Final lines: `PASS: Playwright customer flow, vendor live board, voice announcement, screenshots, and webhook latency samples` and `ALL TESTS PASSED.` Full output: ignored `tests/artifacts/deploy-prep-run-output.txt`.
 - A final full rerun after the design-preview palette correction also passed: 22 Maven tests, 0 failures/errors/skips; API smoke checks; Playwright 1 passed in 16.5s; final output `ALL TESTS PASSED.` Full transcript: ignored `tests/artifacts/final-run-output.txt`.
@@ -120,3 +120,49 @@ git switch codex-takeover
 git status --short --branch
 pwsh -NoProfile -File tests/run-all.ps1
 ```
+
+
+## Task 1: browser auth journey (complete)
+
+- Added Playwright UI coverage for phone/OTP registration, business profile and UPI ID, logout, a fresh OTP login, incorrect OTP feedback, the five-failure lockout, and Hindi text switching. Screenshots are written to ignored `tests/artifacts/` and hide phone/code values. The test obtains the code from the explicitly enabled local dev response rendered by the UI; it never logs or prints the code.
+- Kept the default-mode API/log safety proof in `AttackSuiteTest.otpIsNotReturnedToClientByDefault`; it checks that `/api/auth/send-otp` returns no OTP and that captured application logs contain no six-digit OTP.
+- Made the existing five-failure per-phone lockout visible as HTTP 429 and localized its user-facing message. Ordinary invalid codes remain HTTP 400 and get a separate retry message.
+- Previous redesign review: LoginPage retained OTP sign-in, field validation, new-vendor navigation, and explicit dev-only OTP display. RegisterPage retained phone, UPI ID, business name, optional slug/description/banner/menu, OTP proof and session login; its phone prefill now uses `useEffect`. The only removed content was decorative security-badge copy, restored as localized one-time-code guidance. No auth capability was lost.
+- Full gate attempt 1 failed in the browser: registration remained on `/register`. The UI sent an empty slug despite labeling it optional; backend bean validation rejects empty strings before the service can auto-generate. Fixed by sending `null` when the optional slug is blank. No test was weakened.
+- Full gate attempt 2 passed: `pwsh -NoProfile -File tests/run-all.ps1` exit 0; Maven 22/22, Docker/API smoke checks passed, Playwright 2 passed (17.3s), final lines `PASS: Playwright customer flow, vendor live board, voice announcement, screenshots, and webhook latency samples` and `ALL TESTS PASSED.` Raw transcript: ignored `tests/artifacts/auth-flow-run-2.txt`.
+- Reviewed screenshots show no phone values, OTPs, or tokens. Approved screenshots are copied to `docs/test-evidence/auth-*.png`. Existing `AttackSuiteTest.otpIsNotReturnedToClientByDefault` checks response and captured logs with the default non-dev setting; local E2E enables the explicit test-only OTP flag.
+- Task 1 is complete. Task 2 followed.
+
+
+## Task 2: optional registration invite code (complete)
+
+- Backend reads `INVITE_CODE` through `registration.invite-code`. If blank/unset, registration remains open for local development. If configured, the OTP proof must still be valid and the `X-Invite-Code` header must match; comparison uses constant-time byte equality. Missing and incorrect values return HTTP 403 with a clear message.
+- Frontend registration includes an optional invite-code field and sends it only in the header. CORS permits the explicit header. Compose passes the variable to the backend; `tests/run-all.ps1` clears it temporarily for the local-dev UI flow and restores the caller environment afterward. Production Compose forwards it as an optional backend setting.
+- Added integration tests for missing, incorrect, and correct configured invite codes. The browser journey from task 1 verifies local registration works when the variable is unset. Fixture code is test-only and must not be used as a deployment value.
+- Invite-code full gate attempt 1 failed in the new test. Backend validation logs showed the test helper generated phone strings from UUID hex characters (for example, non-digit characters), so registration did not reach the intended valid profile path; the failure responses also lacked the controller’s expected message. Fixed the fixture to use a numeric 10-digit phone and explicitly send JSON. Added non-null message assertions. No production validation/security rule was changed.
+- Full gate attempt 2 passed: Maven 25 tests (0 failures/errors/skips), Docker/API smoke checks passed, Playwright 2 passed (19.6s), final output `PASS: Playwright customer flow, vendor live board, voice announcement, screenshots, and webhook latency samples` / `ALL TESTS PASSED.` Raw transcript: ignored `tests/artifacts/invite-code-run-2.txt`; p95 110 ms across 20 local samples. The optional-code flow passed with test property configured, and browser registration passed with the environment variable unset. Task 2 is complete.
+
+
+## Task 3: frontend dependency audit (complete)
+
+- Initial `npm audit --json` could not run because the project had no package lock. Generated `frontend/package-lock.json` with `npm install --package-lock-only --ignore-scripts --no-audit --no-fund`; normal sandbox registry DNS was unavailable, so the authorized network retry succeeded.
+- Current audit command: `npm audit --json` (exit 1 because findings exist), raw JSON ignored at `tests/artifacts/npm-audit.json`, stderr at `tests/artifacts/npm-audit-stderr.txt`. Summary: four vulnerable package groups (3 moderate, 1 high), eleven distinct advisories. Locked versions: Vite 5.4.21, esbuild 0.21.5, react-router/react-router-dom 6.30.6.
+- Detailed advisory-by-advisory classification and production/dev reach are in `docs/npm-audit.md`. npm reports only major upgrade paths (React Router DOM 7.18.5, Vite 8.3.6); no safe in-range remediation was available. No force fix or dependency upgrade was applied. Updated Docker frontend image to `npm ci` to consume the audited lockfile.
+- Full gate attempt 1 initially had Docker Buildx lock access denied in sandbox; reran with authorized local Docker access and it passed. Maven 25/25, smoke checks passed, Playwright 2 passed (17.2s), final lines `PASS: Playwright customer flow, vendor live board, voice announcement, screenshots, and webhook latency samples` / `ALL TESTS PASSED.` Raw transcript: ignored `tests/artifacts/npm-audit-gate-1.txt`; local mock p95 80 ms across 20 samples.
+- Task 3 is complete. No dependency upgrade was judged safe under the available major-version-only fix paths. Task 4 followed.
+
+
+## Task 4: auth redesign regression review (complete)
+
+- Compared `frontend/src/pages/LoginPage.jsx` and `RegisterPage.jsx` at `8542903` and `7cb8e75`. Written field-by-field conclusion: no login or registration capability was lost. Formerly unused `updateUser` was unused; phone prefill moved from a state initializer side effect to `useEffect`; the only removed user-facing content was the decorative security badge, now restored as localized one-time-code guidance.
+- Review artifact: `docs/auth-redesign-review.md`. The task-1 UI journey verifies actual profile registration and a fresh login.
+- Task 4 full gate passed: Maven 25/25, API/Compose smoke checks passed, Playwright 2 passed (18.7s), final lines `PASS: Playwright customer flow, vendor live board, voice announcement, screenshots, and webhook latency samples` / `ALL TESTS PASSED.` Raw transcript: ignored `tests/artifacts/auth-review-gate-1.txt`. Latest local p95 was 82 ms across 20 samples.
+- Task 4 is complete. Task 5 followed.
+
+
+## Task 5: wordmark outlines (complete)
+
+- Confirmed Noto Sans is marked OFL in official Google Fonts metadata; the notofonts Devanagari repository states SIL OFL 1.1. References: `docs/brand.md`.
+- Replaced hand-drawn BolPay lettering with six path outlines generated from official Noto Sans variable TTF at weight 700, 30 px, 1 px tracking. Kept the square B mark, SVG title, and live accessible heading. SHA-256 of temporary source TTF: `bfb7bb691513f12e734dc346c03a03f784912432d7e3fa8e56efcf906fe86b3d`. Raw font and FontTools are ignored under `tests/artifacts/`, not committed or shipped.
+- Task 5 full gate passed: Maven 25/25, Docker/API smoke checks passed, Playwright 2 passed (29.6s), final lines `PASS: Playwright customer flow, vendor live board, voice announcement, screenshots, and webhook latency samples` / `ALL TESTS PASSED.` Raw transcript: ignored `tests/artifacts/close-gaps-final-run-1.txt`. Latest local p95 99 ms across 20 samples. Reviewed the refreshed redacted auth screenshot; it shows the Noto Sans outlined wordmark and no phone, OTP, or token.
+- Task 5 is complete. All five requested tasks are complete. No deployment was performed. The final commit should include only reviewed source/docs/screenshots; `.env`, raw npm audit JSON, raw test output, and source font remain ignored. Resume with `git status --short --branch` then `pwsh -NoProfile -File tests/run-all.ps1`.

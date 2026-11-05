@@ -37,7 +37,7 @@ Configure Vercel build variables in the project settings. Keep backend credentia
 | `FRONTEND_HTTP_PORT` | Compose host (optional) | Loopback-only local frontend port for a same-host TLS proxy. |
 | `OTP_RETURN_TO_CLIENT` | Backend | Must remain `false` outside explicit local development. |
 | `MOCK_ADMIN_PASSWORD` | Mock service only | If the mock service is enabled for a controlled demo, set a unique high-entropy password in the host secret store. The mock returns 404 for admin routes when it is unset. Do not use a default, commit it, or expose mock admin routes to the public internet. The production Compose file intentionally does not include the mock service. |
-| `INVITE_CODE` | Not implemented | The backend currently has no `INVITE_CODE` setting or registration check. Do not assume setting this variable gates registration. Add and test server-side invite validation before exposing vendor registration publicly. |
+| `INVITE_CODE` | Backend secret/config | Optional registration gate. When set, registration requires the code in the registration form; store it in the Docker host secret manager and share it only with intended invitees. When unset, vendor registration remains open. It is not a substitute for verified identity or production SMS. |
 
 The app does not yet integrate SMS delivery; production OTP delivery must be selected and implemented before real vendor registration. The login/register pages also have local-demo OTP presentation paths, so verify the non-dev production build and responses before inviting users.
 
@@ -61,7 +61,7 @@ Some container hosts may pause an idle service. The current app has generic load
 - [ ] Configure the public reverse proxy for TLS, `/api/`, SockJS `/ws`, WebSocket upgrade, forwarded headers, and suitable idle timeout. Keep database, backend, and ML ports private.
 - [ ] Ensure the ML container is reachable only on the internal network; confirm no public route reaches `/score` or `/model-info`.
 - [ ] Decide whether to use mock mode for an isolated staging demo. If enabled, configure `MOCK_ADMIN_PASSWORD` in a secret store and block public admin paths; never treat the mock as a live gateway.
-- [ ] Implement and test `INVITE_CODE` enforcement before allowing public registration; configure real SMS delivery and confirm OTP values never reach users' logs or default API responses.
+- [ ] Decide whether registration should be invite-gated. If so, set `INVITE_CODE` in the backend host secret store, share it through a controlled channel, and verify missing/wrong codes are rejected. If unset, anyone can attempt vendor registration. Configure real SMS delivery and confirm OTP values never reach logs or default API responses.
 - [ ] Register the final gateway webhook URL, verify signatures using current provider documentation, and test duplicate, stale, malformed, wrong-amount, and delayed events in sandbox.
 - [ ] Take a PostgreSQL backup and prove restore to a separate database before the first release.
 - [ ] Run `pwsh -NoProfile -File tests/run-all.ps1`, then stage the release and inspect server/browser logs for secrets and tokens.
@@ -77,4 +77,4 @@ Some container hosts may pause an idle service. The current app has generic load
 
 ## What remains manual or incomplete
 
-The hosting provider and payment account choice require the owner. Deployment, real-phone testing, and the vendor survey have not happened. `INVITE_CODE` validation and production SMS are absent. The dedicated cold-start message/retry behavior is also absent. This document is preparation only and makes no production-readiness or scam-prevention claim.
+The hosting provider and payment account choice require the owner. Deployment, real-phone testing, and the vendor survey have not happened. `INVITE_CODE` is supported but optional; leaving it unset permits open registration. Production SMS remains absent. The dedicated cold-start message/retry behavior is also absent. This document is preparation only and makes no production-readiness or scam-prevention claim.

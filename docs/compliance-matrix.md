@@ -11,7 +11,7 @@ Statuses describe repository implementation and current local test evidence; the
 | Risk/ML anomaly scoring | Partial prototype | `ml-service/app.py`, `ml-service/train_models.py`; no production-grade evaluation |
 | Research mode/data collection | Present, limited validation | `ResearchModeService`, `ResearchModeController`, `ResearchSession`; full-runner coverage not identified |
 | Escalate unresolved expired orders to incident log | Implemented; limited automated proof | `ReconciliationService`, `IncidentLogService`, `IncidentLog`; not specifically asserted by current browser flow |
-| OTP authentication and verified registration | Implemented; local proof | `AttackSuiteTest.registrationWithoutOtpProofIsRejected`, `otpIsNotReturnedToClientByDefault`; production SMS is not configured |
+| OTP authentication and verified registration | Implemented; local browser/API proof | UI registration/login flow in `tests/e2e/specs/vendor-flow.spec.js`; `AttackSuiteTest.registrationWithoutOtpProofIsRejected`; `otpIsNotReturnedToClientByDefault`; production SMS is not configured |
 | Webhook signature, timestamp, event ID, amount validation | Tested | `webhookWithoutSignatureIsRejected`, `testForgedWebhook_BadSignature`, `correctlySignedWebhookWithStaleTimestampIsRejected`, `webhookMissingEventIdOrAmountIsRejected`, `testDuplicateWebhook_Idempotent`, `testWrongAmountWebhook_Rejected` |
 | Vendor data isolation | Tested | `AttackSuiteTest.vendorCannotReadAnotherVendorsOrderByCode`; `publicVendorResponseOmitsPhoneAndUpi` |
 | WebSocket topic isolation | Tested over real STOMP/JWT | `WebSocketStompIntegrationTest.signedJwtCanSubscribeToOwnTopicButNotAnotherVendorsTopic`; own topic receives event, other vendor topic denied |
@@ -21,11 +21,12 @@ Statuses describe repository implementation and current local test evidence; the
 | Lost webhook recovery | Tested via drop + reconciliation | `AttackSuiteTest.testLostWebhook_ReconciliationFixes`; uses mock `scenario=drop`, checks PENDING, invokes reconciliation, checks PAID; no manual status edits |
 | Voice announcement | Implemented and browser verified | `frontend/src/pages/VendorDashboard.jsx`; full Playwright gate reports voice announcement pass; `voice-pass` tag |
 | Provider-neutral deployment preparation | Prepared, not deployed | `docker-compose.production.yml`, `frontend/nginx.production.conf`, `docs/deployment-prep.md`; `deploy-prep-pass` tag |
-| Browser flow, screenshots, webhook-to-board p95 | Passed locally | `tests/e2e/specs/vendor-flow.spec.js`; `docs/test-evidence/`; latest 20 samples, p95 86 ms in ignored `tests/artifacts/latency.json` |
-| BolPay brand system | Partial; wired and documented | `frontend/public/brand/`, `frontend/index.html`, vendor headers, `VendorQRPage.jsx`, `docs/brand.md`; original SVG wordmark paths are custom geometry, not paths converted from the selected OFL font |
+| Browser flow, screenshots, webhook-to-board p95 | Passed locally | `tests/e2e/specs/vendor-flow.spec.js`; `docs/test-evidence/`; latest 20 samples, p95 99 ms in ignored `tests/artifacts/latency.json` |
+| BolPay brand system | Implemented and documented | `frontend/public/brand/`, `frontend/index.html`, vendor headers, `VendorQRPage.jsx`, `docs/brand.md`; the BolPay wordmark is outlined from Noto Sans Bold, with Noto Sans Devanagari as its OFL companion |
 | Checkout/POS/queue pattern research | Completed as pattern notes | `docs/ui-research.md`; 10 linked sources, no third-party assets copied |
 | Design plan and static preview | Approved; implementation followed approval | `docs/design-plan.md`, `docs/design-preview/`, 10 360x820 screenshots |
 | Vercel frontend routes and deployment preparation | Prepared, not deployed | `frontend/vercel.json`, `docs/deployment.md`; JSON parsed and full local runner passed |
+| Frontend dependency audit | Current lockfile audited; findings triaged, no major upgrade applied | `docs/npm-audit.md`; `frontend/package-lock.json` |
 | UI redesign | Implemented after approval; locally verified | `frontend/src/i18n.js`, `frontend/src/pages/`, `frontend/src/index.css`; full Playwright flow in `tests/e2e/specs/vendor-flow.spec.js`; screenshots in `docs/test-evidence/` |
 | Live gateway, real-phone test, vendor survey, deployment | Not performed; manual/user work | `docs/deployment-prep.md`, `docs/limitations.md` |
 
@@ -42,6 +43,7 @@ Statuses describe repository implementation and current local test evidence; the
 | Vendor A vs vendor B | `AttackSuiteTest.vendorCannotReadAnotherVendorsOrderByCode`; `WebSocketStompIntegrationTest.signedJwtCanSubscribeToOwnTopicButNotAnotherVendorsTopic` |
 | WebSocket cross-topic / missing or invalid JWT | `WebSocketStompIntegrationTest.signedJwtCanSubscribeToOwnTopicButNotAnotherVendorsTopic`; `missingAndInvalidJwtAreDeniedDuringStompConnect` |
 | Registration without OTP | `AttackSuiteTest.registrationWithoutOtpProofIsRejected` |
+| Configured invite code missing/wrong/correct | `VendorInviteCodeTest.configuredInviteCodeRejectsMissingCodeWithClearMessage`; `configuredInviteCodeRejectsIncorrectCodeWithClearMessage`; `configuredInviteCodeAllowsRegistrationWithCorrectCode` |
 | OTP absent from API and logs | `AttackSuiteTest.otpIsNotReturnedToClientByDefault` |
 | Scan sessions counted | `AttackSuiteTest.scanSessionsArePersistedAndCountedForVendorBoard` |
 | Token uniqueness | `AttackSuiteTest.concurrentOrderCreationAllocatesDistinctActiveTokens`; `OrderTokenAllocationTest` fallback cases |
@@ -49,12 +51,12 @@ Statuses describe repository implementation and current local test evidence; the
 ## Not fixed / remaining gaps
 
 - Duplicate event handling is not tested under concurrent delivery, and the test does not count emitted announcements.
-- npm reported 15 dependency audit findings (14 moderate, 1 high); they remain untriaged.
+- The current npm audit reports 4 vulnerable package groups, including a runtime React Router issue and development-only Vite/esbuild issues; all advisories and major-version-only remediation paths are detailed in `docs/npm-audit.md`.
 - Live gateway/account configuration, production SMS, hosting choice, deployment, real-phone testing, and vendor survey remain outstanding.
 - Historical `step2-pass` and `step3-pass` test reruns in temporary worktrees remain optional and outstanding.
 - No quick-amount chips or Mark-as-served action; both remain planned preview examples.
-- Public registration invite-code enforcement is not implemented; setting `INVITE_CODE` would have no effect.
-- The outlined logo was hand-drawn as original vector geometry, not converted from the selected Noto Sans font; the OFL type pairing is documented and used as the live text stack.
+- `INVITE_CODE` is optional; if unset, registration remains open. When set, the code gates registration but is not identity verification.
+- The logo mark remains original geometric artwork; the BolPay wordmark is outlined from Noto Sans Bold. Noto Sans Devanagari is the OFL companion; the font binary is not bundled.
 - Dedicated cold-start “Waking up the server…” messaging/retry behavior is not implemented; current app uses generic loading states.
 - Production SMS delivery, hosting selection, real-phone checks, and vendor survey remain outstanding.
 - Local mock tests do not prove production security and do not establish scam prevention.

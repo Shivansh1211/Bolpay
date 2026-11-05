@@ -40,7 +40,9 @@ $previousOtpFlag = $env:OTP_RETURN_TO_CLIENT
 $previousExpiryAfter = $env:EXPIRE_AFTER
 $previousExpiryCheck = $env:EXPIRY_CHECK_MS
 $previousCorsOrigins = $env:CORS_ALLOWED_ORIGINS
+$previousInviteCode = $env:INVITE_CODE
 $env:OTP_RETURN_TO_CLIENT = 'true'
+$env:INVITE_CODE = ''
 $env:EXPIRE_AFTER = '5'
 $env:EXPIRY_CHECK_MS = '250'
 $env:CORS_ALLOWED_ORIGINS = 'http://localhost:5173,http://frontend'
@@ -51,6 +53,7 @@ try {
     $env:EXPIRE_AFTER = $previousExpiryAfter
     $env:EXPIRY_CHECK_MS = $previousExpiryCheck
     $env:CORS_ALLOWED_ORIGINS = $previousCorsOrigins
+    $env:INVITE_CODE = $previousInviteCode
 }
 
 Write-Host '== Backend tests using disposable PostgreSQL =='

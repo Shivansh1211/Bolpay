@@ -2,7 +2,7 @@
 
 Status: **prepared for review, not deployed**. No hosting provider has been selected. The configuration builds the existing containers, keeps PostgreSQL and the backend off public host ports, omits the mock payment service, and binds the frontend HTTP port to loopback for a separately configured TLS reverse proxy.
 
-The current frontend dependency tree reported 15 npm audit findings (14 moderate, 1 high) during image builds. Those advisories need review before external use.
+The current lockfile audit reports 4 vulnerable package groups (3 moderate, 1 high by npm package-group summary) across 11 advisory records. React Router findings reach the runtime bundle; Vite and esbuild findings are development/build-only. npm offers only major-version upgrade paths. Full details are in `docs/npm-audit.md`; review them before external use.
 
 ## Production Compose configuration
 
@@ -16,7 +16,7 @@ The file requires these variables from a host secret store or a protected, untra
 - `PUBLIC_BASE_URL`, `CORS_ALLOWED_ORIGINS`
 - Optional `TRUSTED_PROXIES`, `FRONTEND_HTTP_PORT`
 
-The production Compose template deliberately has no real credentials. Its configuration check uses dummy values inside the test runner and does not print them.
+The production Compose template deliberately has no real credentials. Its configuration check uses dummy values inside the test runner and does not print them. Optional backend `INVITE_CODE` restricts registration when set; leaving it unset allows open registration.
 
 ## Commands after selecting a host
 

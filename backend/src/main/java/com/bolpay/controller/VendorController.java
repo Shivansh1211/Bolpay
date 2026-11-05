@@ -10,7 +10,12 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.web.bind.annotation.*;
+
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.util.Map;
 
 /**
  * Controller for vendor endpoints
@@ -24,17 +29,30 @@ public class VendorController {
     private final VendorService vendorService;
     private final AuthService authService;
 
+    @Value("${registration.invite-code:}")
+    private String inviteCode;
+
     /**
      * Register a new vendor
      * POST /api/vendor/register
      */
     @PostMapping("/register")
-    public ResponseEntity<VendorDto> registerVendor(@Valid @RequestBody RegisterVendorRequest request,
-            @RequestHeader(value = "Authorization", required = false) String authorization) {
+    public ResponseEntity<?> registerVendor(@Valid @RequestBody RegisterVendorRequest request,
+            @RequestHeader(value = "Authorization", required = false) String authorization,
+            @RequestHeader(value = "X-Invite-Code", required = false) String suppliedCode) {
         if (authorization == null || !authorization.startsWith("Bearer ")
                 || !authService.isOtpProofForPhone(authorization.substring(7), request.getPhoneNumber())) {
             return ResponseEntity.status(401).build();
         }
+
+        if (inviteCode != null && !inviteCode.isBlank()) {
+            if (suppliedCode == null || !MessageDigest.isEqual(
+                    inviteCode.getBytes(StandardCharsets.UTF_8), suppliedCode.getBytes(StandardCharsets.UTF_8))) {
+                return ResponseEntity.status(403)
+                        .body(Map.of("message", "Enter the correct invite code to create a vendor profile."));
+            }
+        }
+
         VendorDto vendor = vendorService.registerVendor(request);
         return ResponseEntity.ok(vendor);
     }

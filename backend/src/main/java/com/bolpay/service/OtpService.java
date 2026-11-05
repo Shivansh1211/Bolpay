@@ -78,7 +78,11 @@ public class OtpService {
         List<OtpSession> validSessions = otpSessionRepository
                 .findByPhoneNumberAndUsedAtIsNullAndExpiresAtAfter(phoneNumber, LocalDateTime.now());
 
-        if (validSessions.isEmpty() || verifyFailures.getOrDefault(phoneNumber, new AtomicInteger()).get() >= 5) {
+        if (verifyFailures.getOrDefault(phoneNumber, new AtomicInteger()).get() >= 5) {
+            throw new OtpAttemptLimitException("Too many incorrect codes. Request a new code.");
+        }
+
+        if (validSessions.isEmpty()) {
             return false;
         }
 

@@ -6,11 +6,11 @@
 - `AttackSuiteTest.otpIsNotReturnedToClientByDefault` verifies the default API response and captured logs. Local E2E explicitly enables development OTP behavior for test registration.
 - STOMP authentication and vendor topic isolation are verified locally over a signed JWT connection. This does not provide load, browser compatibility, or production infrastructure validation.
 - Duplicate webhook handling is not exercised under concurrent delivery, and emitted WebSocket announcement counts are not asserted.
-- Playwright covers the mock flow, live board updates, voice, and scheduled expiry. It is not a real-phone or live-provider test. The latest measured local webhook-received-to-board-DOM p95 was 82 ms across 20 samples; this is not a production performance guarantee.
+- Playwright covers the mock flow, live board updates, voice, and scheduled expiry. It is not a real-phone or live-provider test. The latest measured local webhook-received-to-board-DOM p95 was 110 ms across 20 samples; this is not a production performance guarantee.
 - No hosting provider has been selected and no deployment has occurred.
 - The user approved the design plan on 2026-11-05 and the live UI redesign is implemented. Quick amount and Mark as served remain preview-only examples.
-- The logo wordmark is original hand-drawn SVG path geometry, not a conversion of the selected OFL typeface to outlines.
-- Registration has no `INVITE_CODE` server-side gate; setting an environment variable with that name currently has no effect.
+- The wordmark uses Noto Sans Bold converted to SVG paths; Noto Sans Devanagari is the OFL companion. No font binaries are bundled.
+- Registration supports an optional server-side `INVITE_CODE` gate. When unset, registration is open; when set, possession of the code is required but does not establish the invitee’s identity. Production must store/manage the code securely if this gate is desired.
 - A dedicated “Waking up the server…” state and safe retry/backoff behavior for sleeping hosts are not implemented.
-- Frontend npm audit reported 15 findings (14 moderate, 1 high); they remain untriaged.
+- The current frontend lockfile audit reports 4 vulnerable package groups (npm package-group summary: 3 moderate, 1 high) across 11 advisory records. The direct React Router runtime package has two moderate advisories; Vite/esbuild findings are development/build-only. All audit-suggested remediations require major upgrades, so no dependency was changed to chase green. See [docs/npm-audit.md](npm-audit.md).
 - The prototype is not production-ready and does not claim to prevent scams.

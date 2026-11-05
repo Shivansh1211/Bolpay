@@ -44,3 +44,15 @@
 - Rebuilt login, registration, shared form components, and the printable bilingual QR card to match the approved design.
 - Added focus, reduced-motion, responsive tap-target, and print treatments to the live UI.
 - Aligned Playwright assertions with approved “Verified” wording and scoped the paid-state check to its status element.
+
+- Added browser-driven registration and login coverage, including OTP verification, wrong-code feedback, attempt lockout, and English-to-Hindi switching.
+- Returned a distinct rate-limit status after five incorrect OTP attempts and added localized retry/lockout messages.
+- Restored localized one-time-code security guidance on the login and registration screens after reviewing the redesign diff.
+- Fixed registration with the optional slug left blank by omitting the empty value so the backend can generate it.
+- Added an optional server-side `INVITE_CODE` registration gate with clear 403 feedback; registration remains available when unset.
+- Forwarded `INVITE_CODE` through Docker Compose, allowed its explicit browser header in CORS, and added configured-code integration coverage.
+
+- Added the frontend npm lockfile and switched the Docker build to `npm ci` for repeatable dependency resolution.
+- Triaged every advisory in the current npm audit; deferred only major-version updates and documented package reach and rationale.
+- Recorded the login/register redesign diff review and confirmed auth fields and navigation were preserved; restored localized security guidance.
+- Replaced the hand-drawn BolPay wordmark with Noto Sans Bold SVG path outlines and recorded the OFL source and conversion hash.

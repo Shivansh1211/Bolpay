@@ -1,7 +1,7 @@
-Safe excerpt from the actual final UI successful run of `pwsh -NoProfile -File tests/run-all.ps1` (exit code 0). Full raw output is stored in ignored `tests/artifacts/ui-final-output.txt`.
+Safe excerpt from the actual final gap-closing run of `pwsh -NoProfile -File tests/run-all.ps1` (exit code 0). Full raw output is stored in ignored `tests/artifacts/close-gaps-final-run-1.txt`.
 
 ```text
-[INFO] Tests run: 22, Failures: 0, Errors: 0, Skipped: 0
+[INFO] Tests run: 25, Failures: 0, Errors: 0, Skipped: 0
 [INFO] BUILD SUCCESS
 PASS: temporary PostgreSQL started with no persisted volume.
 PASS: backend started with PAYMENT_GATEWAY=mock.
@@ -11,15 +11,17 @@ PASS: nginx returns 404 for /mock-admin and /admin/attack/... .
 STEP 1 SMOKE TESTS PASSED.
 == Playwright browser and webhook-to-board tests ==
 Running 1 test using 1 worker
-  1 passed (14.2s)
+  2 passed (29.6s)
 PASS: Playwright customer flow, vendor live board, voice announcement, screenshots, and webhook latency samples
 ALL TESTS PASSED.
 ```
 
+This final full run reported 25 Maven tests with 0 failures, errors, or skips and 2 Playwright tests passed. Its complete raw output is ignored at `tests/artifacts/close-gaps-final-run-1.txt`.
+
 The exact final lines emitted by the runner were:
 
 ```text
-  1 passed (14.2s)
+  2 passed (29.6s)
 PASS: Playwright customer flow, vendor live board, voice announcement, screenshots, and webhook latency samples
 ALL TESTS PASSED.
 ```

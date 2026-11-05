@@ -11,6 +11,7 @@ const RegisterPage = () => {
   const [otpRequested, setOtpRequested] = useState(false);
   const [otpCode, setOtpCode] = useState('');
   const [receivedOtp, setReceivedOtp] = useState('');
+  const [inviteCode, setInviteCode] = useState('');
   const { user, login } = useAuth();
   const { language, setLanguage, t } = useTranslation();
   const navigate = useNavigate();
@@ -33,11 +34,14 @@ const RegisterPage = () => {
         return;
       }
       const verified = await authAPI.verifyOtp(formData.phoneNumber, otpCode);
-      const response = await vendorAPI.register(formData, verified.data.token);
+      const response = await vendorAPI.register({ ...formData, slug: formData.slug || null }, verified.data.token, inviteCode.trim());
       login({ token: verified.data.token, vendor: response.data });
       navigate('/vendor/dashboard');
-    } catch {
-      setError('registerError');
+    } catch (requestError) {
+      if (requestError.response?.status === 403) setError('inviteCodeError');
+      else if (requestError.response?.status === 429) setError('otpRateLimit');
+      else if (requestError.response?.status === 400) setError('otpVerifyError');
+      else setError('registerError');
     } finally {
       setLoading(false);
     }
@@ -60,7 +64,7 @@ const RegisterPage = () => {
               <div>
                 <label htmlFor="registrationOtp" className="field-label">{t('otpCode')}</label>
                 <input id="registrationOtp" name="registrationOtp" inputMode="numeric" autoComplete="one-time-code" maxLength={6} required value={otpCode} onChange={(event) => setOtpCode(event.target.value)} className="field-input text-center text-2xl font-bold tracking-widest" />
-                {receivedOtp && <p className="mt-2 border-l-4 border-status-waiting px-3 py-2 text-small">{t('localOtp')}: {receivedOtp}</p>}
+                {receivedOtp && <p data-testid="local-otp-demo" className="mt-2 border-l-4 border-status-waiting px-3 py-2 text-small">{t('localOtp')}: {receivedOtp}</p>}
               </div>
             )}
             <div>
@@ -71,6 +75,11 @@ const RegisterPage = () => {
               <label htmlFor="upiId" className="field-label">{t('upiId')}</label>
               <input id="upiId" name="upiId" required value={formData.upiId} onChange={handleChange} className="field-input" placeholder={t('upiPlaceholder')} />
               <p className="mt-1 text-small text-text-secondary">{t('paymentDestination')}</p>
+            </div>
+            <div>
+              <label htmlFor="inviteCode" className="field-label">{t('inviteCode')}</label>
+              <input id="inviteCode" name="inviteCode" autoComplete="off" value={inviteCode} onChange={(event) => setInviteCode(event.target.value)} className="field-input" />
+              <p className="mt-1 text-small text-text-secondary">{t('inviteCodeHelp')}</p>
             </div>
             <div>
               <label htmlFor="slug" className="field-label">{t('customSlug')}</label>
@@ -93,6 +102,7 @@ const RegisterPage = () => {
             <button type="submit" disabled={loading} className="primary-action w-full">{loading ? t('processing') : otpRequested ? t('registerVerify') : t('registerSend')}</button>
           </form>
         </section>
+        <p className="mt-6 text-center text-small text-text-secondary">{t('securityBadge')}</p>
       </main>
     </div>
   );

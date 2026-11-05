@@ -26,7 +26,7 @@ const messages = {
     saveAmount: 'Enter the amount you agreed with the vendor.',
     vendorLogin: 'Vendor sign in', verifyPhone: 'Verify your phone', loginIntro: 'Sign in to open your vendor board.',
     phoneNumber: 'Phone number', phonePlaceholder: '10-digit number', otpCode: 'One-time code', localOtp: 'Local demo code',
-    otpSendError: 'We could not send a code. Check the phone number and try again.', otpVerifyError: 'That code could not be verified. Check it and try again.',
+    otpSendError: 'We could not send a code. Check the phone number and try again.', otpVerifyError: 'That code could not be verified. Check it and try again.', otpRateLimit: 'Too many incorrect codes. Request a new code before trying again.', securityBadge: 'Your sign-in uses a one-time code.',
     sendOtp: 'Send code', verifyOtp: 'Verify code', newVendor: 'New vendor?', register: 'Register',
     registerTitle: 'Set up your business', registerIntro: 'Add your details to create a vendor profile.',
     businessName: 'Business name', businessNamePlaceholder: 'For example, Sharma Paratha Stall',
@@ -35,6 +35,8 @@ const messages = {
     description: 'Description', descriptionPlaceholder: 'Describe your business', bannerUrl: 'Banner image URL (optional)', menuItems: 'Menu items (JSON, optional)',
     menuHelp: 'Use a JSON list with a name and price for each item.', registerSend: 'Send verification code', registerVerify: 'Verify and create profile',
     registerError: 'We could not complete registration. Check your details and try again.',
+    inviteCode: 'Invite code', inviteCodeHelp: 'Enter the invite code from the person who invited you, if required.',
+    inviteCodeError: 'This registration needs a valid invite code. Check it with the person who invited you and try again.',
   },
   hi: {
     language: 'भाषा', english: 'English', hindi: 'हिन्दी', brand: 'बोलपे',
@@ -61,7 +63,7 @@ const messages = {
     saveAmount: 'विक्रेता से तय की गई राशि लिखें।',
     vendorLogin: 'विक्रेता साइन इन', verifyPhone: 'फ़ोन की पुष्टि करें', loginIntro: 'विक्रेता बोर्ड खोलने के लिए साइन इन करें।',
     phoneNumber: 'फ़ोन नंबर', phonePlaceholder: '10 अंकों का नंबर', otpCode: 'एक बार का कोड', localOtp: 'स्थानीय डेमो कोड',
-    otpSendError: 'कोड नहीं भेज सके। फ़ोन नंबर जाँचकर फिर कोशिश करें।', otpVerifyError: 'कोड की पुष्टि नहीं हुई। जाँचकर फिर कोशिश करें।',
+    otpSendError: 'कोड नहीं भेज सके। फ़ोन नंबर जाँचकर फिर कोशिश करें।', otpVerifyError: 'कोड की पुष्टि नहीं हुई। जाँचकर फिर कोशिश करें।', otpRateLimit: 'कई गलत कोड डाले गए। फिर कोशिश करने से पहले नया कोड लें।', securityBadge: 'साइन इन के लिए एक बार का कोड इस्तेमाल होता है।',
     sendOtp: 'कोड भेजें', verifyOtp: 'कोड की पुष्टि करें', newVendor: 'नए विक्रेता हैं?', register: 'रजिस्टर करें',
     registerTitle: 'अपना कारोबार जोड़ें', registerIntro: 'विक्रेता प्रोफ़ाइल बनाने के लिए जानकारी भरें।',
     businessName: 'कारोबार का नाम', businessNamePlaceholder: 'उदाहरण: शर्मा पराठा स्टॉल',
@@ -70,6 +72,8 @@ const messages = {
     description: 'विवरण', descriptionPlaceholder: 'अपने कारोबार के बारे में बताएँ', bannerUrl: 'बैनर चित्र का URL (वैकल्पिक)', menuItems: 'मेन्यू आइटम (JSON, वैकल्पिक)',
     menuHelp: 'हर आइटम का नाम और कीमत JSON सूची में लिखें।', registerSend: 'पुष्टि कोड भेजें', registerVerify: 'पुष्टि करें और प्रोफ़ाइल बनाएँ',
     registerError: 'रजिस्ट्रेशन पूरा नहीं हुआ। जानकारी जाँचकर फिर कोशिश करें।',
+    inviteCode: 'आमंत्रण कोड', inviteCodeHelp: 'ज़रूरत हो तो आमंत्रित करने वाले से मिला कोड लिखें।',
+    inviteCodeError: 'रजिस्ट्रेशन के लिए सही आमंत्रण कोड चाहिए। आमंत्रित करने वाले से पूछकर फिर कोशिश करें।',
   },
 };
 

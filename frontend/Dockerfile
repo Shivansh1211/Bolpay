@@ -10,7 +10,7 @@ ARG VITE_WS_URL=
 ENV VITE_WS_URL=$VITE_WS_URL
 
 COPY package.json package-lock.json* ./
-RUN npm install
+RUN npm ci
 
 COPY . .
 RUN npm run build

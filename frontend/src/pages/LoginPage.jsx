@@ -38,8 +38,8 @@ const LoginPage = () => {
       const response = await authAPI.verifyOtp(phoneNumber, otpCode);
       login(response.data);
       navigate(response.data.isNewUser ? '/register' : '/vendor/dashboard');
-    } catch {
-      setError('otpVerifyError');
+    } catch (requestError) {
+      setError(requestError.response?.status === 429 ? 'otpRateLimit' : 'otpVerifyError');
     } finally {
       setLoading(false);
     }
@@ -72,7 +72,7 @@ const LoginPage = () => {
                   <label htmlFor="otp" className="field-label">{t('otpCode')}</label>
                   <input id="otp" name="otp" inputMode="numeric" autoComplete="one-time-code" required value={otpCode} onChange={(event) => setOtpCode(event.target.value)} className="field-input text-center text-2xl font-bold tracking-widest" placeholder="••••••" maxLength={6} />
                 </div>
-                {receivedOtp && <p className="border-l-4 border-status-waiting px-3 py-2 text-small">{t('localOtp')}: {receivedOtp}</p>}
+                {receivedOtp && <p data-testid="local-otp-demo" className="border-l-4 border-status-waiting px-3 py-2 text-small">{t('localOtp')}: {receivedOtp}</p>}
               </>
             )}
             <button type="submit" disabled={loading} className="primary-action w-full">
@@ -81,6 +81,7 @@ const LoginPage = () => {
           </form>
           {!otpSent && <p className="mt-6 text-center text-small">{t('newVendor')} <button type="button" onClick={() => navigate('/register')} className="min-h-target px-2 font-bold text-brand underline underline-offset-2">{t('register')}</button></p>}
         </section>
+        <p className="mt-6 text-center text-small text-text-secondary">{t('securityBadge')}</p>
       </main>
     </div>
   );

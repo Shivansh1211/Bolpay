@@ -69,6 +69,78 @@ test.afterAll(async () => {
   }
 });
 
+test('vendor registers and signs in through the UI, with OTP errors and Hindi switching', async ({ page }) => {
+  fs.mkdirSync(screenshotDir, { recursive: true });
+  const phoneNumber = `8${String(Math.floor(Math.random() * 1_000_000_000)).padStart(9, '0')}`;
+  const businessName = 'UI Registration Stall';
+  const upiId = `ui-${Math.random().toString(36).slice(2, 9)}@upi`;
+  const screenshot = async (fileName) => {
+    await page.screenshot({ path: path.join(screenshotDir, fileName), fullPage: true });
+  };
+  const hideTestSecrets = async () => page.addStyleTag({ content: '[data-testid="local-otp-demo"] { visibility: hidden !important; } input[type="tel"], input[autocomplete="one-time-code"] { color: transparent !important; text-shadow: none !important; }' });
+  const readLocalOtpForTest = async () => {
+    const text = await page.getByTestId('local-otp-demo').textContent();
+    const code = text?.match(/\b\d{6}\b/)?.[0];
+    if (!code) throw new Error('UI did not display the configured test-only OTP.');
+    return code;
+  };
+  const requestUiOtp = async (phone) => {
+    await page.getByLabel('Phone number').fill(phone);
+    await page.getByRole('button', { name: 'Send code' }).click();
+    return readLocalOtpForTest();
+  };
+  const logout = async () => {
+    await page.getByRole('button', { name: 'Log out' }).click();
+    await expect(page).toHaveURL(/\/login$/);
+  };
+
+  await page.goto(`${frontendUrl}/register`);
+  await page.getByLabel('Phone number').fill(phoneNumber);
+  await page.getByLabel('Business name').fill(businessName);
+  await page.getByLabel('UPI ID').fill(upiId);
+  await hideTestSecrets();
+  await screenshot('auth-01-registration-details-redacted.png');
+  await page.getByRole('button', { name: 'Send verification code' }).click();
+  const registrationOtp = await readLocalOtpForTest();
+  await page.getByLabel('One-time code').fill(registrationOtp);
+  await page.getByRole('button', { name: 'Verify and create profile' }).click();
+  await expect(page).toHaveURL(/\/vendor\/dashboard$/);
+  await expect(page.getByRole('button', { name: 'Log out' })).toBeVisible();
+  await logout();
+
+  await page.goto(`${frontendUrl}/login`);
+  const firstLoginOtp = await requestUiOtp(phoneNumber);
+  await page.getByLabel('One-time code').fill(firstLoginOtp);
+  await page.getByRole('button', { name: 'Verify code' }).click();
+  await expect(page).toHaveURL(/\/vendor\/dashboard$/);
+  await expect(page.getByRole('button', { name: 'Log out' })).toBeVisible();
+  await logout();
+
+  await page.goto(`${frontendUrl}/login`);
+  const lockoutOtp = await requestUiOtp(phoneNumber);
+  const wrongOtp = lockoutOtp === '000000' ? '000001' : '000000';
+  await hideTestSecrets();
+  await page.getByLabel('One-time code').fill(wrongOtp);
+  await page.getByRole('button', { name: 'Verify code' }).click();
+  await expect(page.getByRole('alert')).toHaveText('That code could not be verified. Check it and try again.');
+  await screenshot('auth-02-wrong-code.png');
+
+  for (let attempt = 1; attempt < 5; attempt++) {
+    await page.getByLabel('One-time code').fill(wrongOtp);
+    await page.getByRole('button', { name: 'Verify code' }).click();
+    await expect(page.getByRole('alert')).toHaveText('That code could not be verified. Check it and try again.');
+  }
+  await page.getByLabel('One-time code').fill(wrongOtp);
+  await page.getByRole('button', { name: 'Verify code' }).click();
+  await expect(page.getByRole('alert')).toHaveText('Too many incorrect codes. Request a new code before trying again.');
+  await screenshot('auth-03-rate-limited.png');
+
+  await page.getByRole('combobox', { name: 'Language' }).selectOption('hi');
+  await expect(page.getByRole('heading', { name: 'फ़ोन की पुष्टि करें' })).toBeVisible();
+  await expect(page.getByRole('alert')).toHaveText('कई गलत कोड डाले गए। फिर कोशिश करने से पहले नया कोड लें।');
+  await screenshot('auth-04-hindi-rate-limit.png');
+});
+
 test('scan, pending, verified payment, and abandoned order lifecycle', async ({ page }) => {
   fs.mkdirSync(screenshotDir, { recursive: true });
   const context = page.context();

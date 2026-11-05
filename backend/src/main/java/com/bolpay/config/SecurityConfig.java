@@ -75,6 +75,7 @@ public class SecurityConfig {
         // Specific headers instead of wildcard
         configuration.setAllowedHeaders(Arrays.asList(
             "Authorization",
+            "X-Invite-Code",
             "Content-Type",
             "X-Webhook-Signature",
             "X-Webhook-Timestamp",

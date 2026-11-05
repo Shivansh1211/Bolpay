@@ -4,6 +4,7 @@ import com.bolpay.dto.AuthResponse;
 import com.bolpay.dto.SendOtpRequest;
 import com.bolpay.dto.VerifyOtpRequest;
 import com.bolpay.service.AuthService;
+import com.bolpay.service.OtpAttemptLimitException;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -46,7 +47,13 @@ public class AuthController {
      */
     @PostMapping("/verify-otp")
     public ResponseEntity<AuthResponse> verifyOtp(@Valid @RequestBody VerifyOtpRequest request) {
-        AuthResponse authResponse = authService.verifyOtp(request.getPhoneNumber(), request.getOtpCode());
-        return ResponseEntity.ok(authResponse);
+        try {
+            AuthResponse authResponse = authService.verifyOtp(request.getPhoneNumber(), request.getOtpCode());
+            return ResponseEntity.ok(authResponse);
+        } catch (OtpAttemptLimitException ex) {
+            return ResponseEntity.status(429).build();
+        } catch (IllegalArgumentException ex) {
+            return ResponseEntity.badRequest().build();
+        }
     }
 }
