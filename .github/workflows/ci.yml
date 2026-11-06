@@ -1,0 +1,140 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: bolpay-ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  backend-tests:
+    name: Backend tests
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:15-alpine
+        env:
+          POSTGRES_DB: bolpay_test
+          POSTGRES_USER: bolpay_test
+          POSTGRES_PASSWORD: ci-only-password
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U bolpay_test -d bolpay_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+    env:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://localhost:5432/bolpay_test
+      POSTGRES_USER: bolpay_test
+      SPRING_DATASOURCE_PASSWORD: ci-only-password
+      SPRING_PROFILES_ACTIVE: dev
+      PAYMENT_GATEWAY: mock
+      OTP_RETURN_TO_CLIENT: 'false'
+      INVITE_CODE: ''
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6.1.0
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: maven
+          cache-dependency-path: backend/pom.xml
+      - name: Generate disposable test credentials
+        shell: bash
+        run: |
+          for name in JWT_SECRET CASHFREE_WEBHOOK_SECRET CASHFREE_CLIENT_SECRET ML_API_KEY MOCK_ADMIN_PASSWORD; do
+            value="$(openssl rand -hex 32)"
+            echo "::add-mask::$value"
+            printf '%s=%s\n' "$name" "$value" >> "$GITHUB_ENV"
+          done
+      - name: Run backend tests
+        working-directory: backend
+        run: mvn -B -ntp test
+
+  frontend:
+    name: Frontend lint and build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: Install, lint, and build
+        working-directory: frontend
+        run: |
+          npm ci
+          npm run lint
+          npm run build
+
+  secret-scan:
+    name: Gitleaks history and working-tree scan
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Scan full Git history
+        run: docker run --rm -v "$GITHUB_WORKSPACE:/repo" ghcr.io/gitleaks/gitleaks:v8.30.1@sha256:c00b6bd0aeb3071cbcb79009cb16a60dd9e0a7c60e2be9ab65d25e6bc8abbb7f git /repo --redact=100
+      - name: Scan checked-out files
+        run: docker run --rm -v "$GITHUB_WORKSPACE:/repo" ghcr.io/gitleaks/gitleaks:v8.30.1@sha256:c00b6bd0aeb3071cbcb79009cb16a60dd9e0a7c60e2be9ab65d25e6bc8abbb7f dir /repo --redact=100
+
+  full-docker-playwright-gate:
+    name: Full Docker and Playwright gate
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Generate disposable mock credentials
+        shell: bash
+        run: |
+          for name in POSTGRES_PASSWORD JWT_SECRET CASHFREE_CLIENT_SECRET CASHFREE_WEBHOOK_SECRET ML_API_KEY MOCK_ADMIN_PASSWORD; do
+            value="$(openssl rand -hex 32)"
+            echo "::add-mask::$value"
+            printf '%s=%s\n' "$name" "$value" >> "$GITHUB_ENV"
+          done
+      - name: Run full Docker, API, and Playwright gate
+        shell: bash
+        run: |
+          set -o pipefail
+          mkdir -p tests/artifacts
+          pwsh -NoProfile -File tests/run-all.ps1 2>&1 | tee tests/artifacts/ci-run-all-output.txt
+      - name: Upload reviewed screenshots and test output
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: bolpay-ci-evidence
+          path: |
+            tests/artifacts/ci-run-all-output.txt
+            tests/artifacts/latency.json
+            tests/artifacts/00-vendor-qr-card.png
+            tests/artifacts/01-vendor-board-initial.png
+            tests/artifacts/02-customer-scan.png
+            tests/artifacts/03-vendor-scanned-counter.png
+            tests/artifacts/04-customer-amount.png
+            tests/artifacts/05-customer-token-redacted.png
+            tests/artifacts/06-vendor-pending-amber.png
+            tests/artifacts/07-mock-checkout.png
+            tests/artifacts/08-vendor-paid-green.png
+            tests/artifacts/09-customer-verified.png
+            tests/artifacts/10-vendor-abandoned-red.png
+            tests/artifacts/auth-01-registration-details-fake-data.png
+            tests/artifacts/auth-02-wrong-code.png
+            tests/artifacts/auth-03-rate-limited.png
+            tests/artifacts/auth-04-hindi-rate-limit.png
+          if-no-files-found: warn
+          retention-days: 3

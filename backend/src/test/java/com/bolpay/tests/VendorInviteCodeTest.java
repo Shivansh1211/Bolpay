@@ -69,13 +69,13 @@ class VendorInviteCodeTest {
 
     private ResponseEntity<String> attemptRegistration(String inviteCode) {
         String suffix = UUID.randomUUID().toString().replace("-", "").substring(0, 10);
-        String phone = "9" + String.format("%09d", Math.floorMod(System.nanoTime(), 1_000_000_000L));
+        String phone = "900000" + String.format("%04d", Math.floorMod(System.nanoTime(), 10_000));
         String otp = otpService.generateAndSendOtp(phone);
         AuthResponse proof = authService.verifyOtp(phone, otp);
 
         Map<String, String> profile = new HashMap<>();
         profile.put("phoneNumber", phone);
-        profile.put("upiId", "invite-" + suffix + "@upi");
+        profile.put("upiId", "demo.invite." + suffix + "@examplebank");
         profile.put("businessName", "Invite Code Test Stall");
         profile.put("slug", "invite-" + suffix);
 

@@ -101,7 +101,7 @@ public class OtpService {
         otpSessionRepository.save(session);
         verifyFailures.remove(phoneNumber);
 
-        log.info("OTP verified successfully for phone: {}", phoneNumber);
+        log.info("OTP verified successfully");
         return true;
     }
 

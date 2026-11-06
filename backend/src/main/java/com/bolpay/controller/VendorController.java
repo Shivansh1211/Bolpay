@@ -10,6 +10,7 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.HttpStatus;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.web.bind.annotation.*;
 
@@ -53,8 +54,20 @@ public class VendorController {
             }
         }
 
-        VendorDto vendor = vendorService.registerVendor(request);
-        return ResponseEntity.ok(vendor);
+        try {
+            VendorDto vendor = vendorService.registerVendor(request);
+            return ResponseEntity.ok(vendor);
+        } catch (IllegalArgumentException ex) {
+            if ("Phone number already registered".equals(ex.getMessage())) {
+                return ResponseEntity.status(HttpStatus.CONFLICT)
+                        .body(Map.of("code", "PHONE_ALREADY_REGISTERED"));
+            }
+            if ("Slug already taken".equals(ex.getMessage())) {
+                return ResponseEntity.status(HttpStatus.CONFLICT)
+                        .body(Map.of("code", "SLUG_TAKEN"));
+            }
+            throw ex;
+        }
     }
 
     /**

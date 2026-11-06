@@ -13,13 +13,16 @@ let mock;
 let vendor;
 let vendorAuth;
 
+// The repeated-prefix range is synthetic test data and never used for real SMS.
+const fakePhoneNumber = () => `900000${String(Math.floor(Math.random() * 10_000)).padStart(4, '0')}`;
+
 test.beforeAll(async () => {
   if (!apiUrl || !mockUrl || !frontendUrl) throw new Error('Playwright service URLs were not configured.');
   api = await request.newContext({ baseURL: apiUrl });
   mock = await request.newContext({ baseURL: mockUrl });
 
   const suffix = Math.random().toString(36).slice(2, 10);
-  const phoneNumber = `9${String(Math.floor(Math.random() * 1_000_000_000)).padStart(9, '0')}`;
+  const phoneNumber = fakePhoneNumber();
   const sendOtp = async () => {
     const response = await api.post('/api/auth/send-otp', { data: { phoneNumber } });
     if (!response.ok()) throw new Error('Test OTP request failed.');
@@ -37,7 +40,7 @@ test.beforeAll(async () => {
     headers: { Authorization: `Bearer ${proof.token}` },
     data: {
       phoneNumber,
-      upiId: `e2e-${suffix}@upi`,
+      upiId: `demo.vendor.${suffix}@examplebank`,
       businessName: 'E2E Vendor',
       slug: `e2e-${suffix}`,
       description: 'Automated browser test vendor',
@@ -71,22 +74,23 @@ test.afterAll(async () => {
 
 test('vendor registers and signs in through the UI, with OTP errors and Hindi switching', async ({ page }) => {
   fs.mkdirSync(screenshotDir, { recursive: true });
-  const phoneNumber = `8${String(Math.floor(Math.random() * 1_000_000_000)).padStart(9, '0')}`;
+  const phoneNumber = fakePhoneNumber();
   const businessName = 'UI Registration Stall';
-  const upiId = `ui-${Math.random().toString(36).slice(2, 9)}@upi`;
+  const upiId = 'demo.vendor@examplebank';
+  const firstSlug = `ui-${Math.random().toString(36).slice(2, 9)}`;
   const screenshot = async (fileName) => {
     await page.screenshot({ path: path.join(screenshotDir, fileName), fullPage: true });
   };
-  const hideTestSecrets = async () => page.addStyleTag({ content: '[data-testid="local-otp-demo"] { visibility: hidden !important; } input[type="tel"], input[autocomplete="one-time-code"] { color: transparent !important; text-shadow: none !important; }' });
+  const hideTestSecrets = async () => page.addStyleTag({ content: '[data-testid="local-otp-demo"] { visibility: hidden !important; } input[autocomplete="one-time-code"] { color: transparent !important; text-shadow: none !important; }' });
   const readLocalOtpForTest = async () => {
     const text = await page.getByTestId('local-otp-demo').textContent();
     const code = text?.match(/\b\d{6}\b/)?.[0];
     if (!code) throw new Error('UI did not display the configured test-only OTP.');
     return code;
   };
-  const requestUiOtp = async (phone) => {
+  const requestUiOtp = async (phone, buttonName = 'Send code') => {
     await page.getByLabel('Phone number').fill(phone);
-    await page.getByRole('button', { name: 'Send code' }).click();
+    await page.getByRole('button', { name: buttonName }).click();
     return readLocalOtpForTest();
   };
   const logout = async () => {
@@ -98,14 +102,37 @@ test('vendor registers and signs in through the UI, with OTP errors and Hindi sw
   await page.getByLabel('Phone number').fill(phoneNumber);
   await page.getByLabel('Business name').fill(businessName);
   await page.getByLabel('UPI ID').fill(upiId);
+  await page.getByLabel('Custom link ending (optional)').fill(firstSlug);
+  await expect(page.getByLabel('Phone number')).toHaveValue(phoneNumber);
+  await expect(page.getByLabel('UPI ID')).toHaveValue(upiId);
   await hideTestSecrets();
-  await screenshot('auth-01-registration-details-redacted.png');
+  await screenshot('auth-01-registration-details-fake-data.png');
   await page.getByRole('button', { name: 'Send verification code' }).click();
   const registrationOtp = await readLocalOtpForTest();
   await page.getByLabel('One-time code').fill(registrationOtp);
   await page.getByRole('button', { name: 'Verify and create profile' }).click();
   await expect(page).toHaveURL(/\/vendor\/dashboard$/);
   await expect(page.getByRole('button', { name: 'Log out' })).toBeVisible();
+  await logout();
+
+  await page.goto(`${frontendUrl}/register`);
+  const duplicatePhone = fakePhoneNumber();
+  await page.getByLabel('Business name').fill('Duplicate Link Test Stall');
+  await page.getByLabel('UPI ID').fill('demo.duplicate@examplebank');
+  await page.getByLabel('Custom link ending (optional)').fill(firstSlug);
+  const duplicateOtp = await requestUiOtp(duplicatePhone, 'Send verification code');
+  await page.getByLabel('One-time code').fill(duplicateOtp);
+  await page.getByRole('button', { name: 'Verify and create profile' }).click();
+  await expect(page.getByRole('alert')).toHaveText('That shop link is already in use. Choose a different link, then request a new code to continue.');
+  await expect(page.getByRole('button', { name: 'Send verification code' })).toBeVisible();
+  await hideTestSecrets();
+  await screenshot('auth-05-duplicate-shop-link.png');
+
+  await page.getByLabel('Custom link ending (optional)').fill(`${firstSlug}-second`);
+  const retryOtp = await requestUiOtp(duplicatePhone, 'Send verification code');
+  await page.getByLabel('One-time code').fill(retryOtp);
+  await page.getByRole('button', { name: 'Verify and create profile' }).click();
+  await expect(page).toHaveURL(/\/vendor\/dashboard$/);
   await logout();
 
   await page.goto(`${frontendUrl}/login`);
@@ -191,13 +218,17 @@ test('scan, pending, verified payment, and abandoned order lifecycle', async ({ 
     localStorage.setItem('token', auth.token);
     localStorage.setItem('user', JSON.stringify(auth.vendor));
     window.__spokenAnnouncements = [];
+    window.__spokenUtterances = [];
     window.__openedCheckoutUrl = null;
     window.open = (url) => {
       window.__openedCheckoutUrl = String(url);
       return null;
     };
     if ('speechSynthesis' in window && window.speechSynthesis) {
-      window.speechSynthesis.speak = (utterance) => window.__spokenAnnouncements.push(utterance.text);
+      window.speechSynthesis.speak = (utterance) => {
+        window.__spokenAnnouncements.push(utterance.text);
+        window.__spokenUtterances.push({ text: utterance.text, lang: utterance.lang, rate: utterance.rate, pitch: utterance.pitch });
+      };
     }
   }, { auth: vendorAuth });
 
@@ -209,6 +240,14 @@ test('scan, pending, verified payment, and abandoned order lifecycle', async ({ 
   await dashboard.getByRole('button', { name: 'Voice Off' }).click();
   await expect(dashboard.getByRole('button', { name: 'Voice On' })).toHaveAttribute('aria-pressed', 'true');
 
+  await dashboard.goto(`${frontendUrl}/vendor/qr`);
+  await expect(dashboard.getByRole('heading', { name: 'E2E Vendor' })).toBeVisible();
+  await expect(dashboard.getByText(vendor.upiId, { exact: false })).toBeVisible();
+  await expect(dashboard.locator('canvas')).toBeVisible();
+  await dashboard.screenshot({ path: path.join(screenshotDir, '00-vendor-qr-card.png'), fullPage: true });
+  await dashboard.goto(`${frontendUrl}/vendor/dashboard`);
+  await expect(dashboard.getByTestId('scan-count')).toHaveText('0');
+
   const customer = await context.newPage();
   const scanResponsePromise = customer.waitForResponse((response) =>
     response.request().method() === 'POST' && response.url().includes('/api/public/scan/'));
@@ -218,8 +257,9 @@ test('scan, pending, verified payment, and abandoned order lifecycle', async ({ 
   await expect(customer.getByRole('heading', { name: 'E2E Vendor' })).toBeVisible();
   await customer.screenshot({ path: path.join(screenshotDir, '02-customer-scan.png'), fullPage: true });
 
-  await dashboard.reload();
   await expect(dashboard.getByTestId('scan-count')).toHaveText('1');
+  await expect(dashboard.getByTestId('scan-count')).toHaveText('1', { timeout: 8_000 });
+  await expect(dashboard.getByText('A customer just scanned this QR')).toBeVisible();
   await dashboard.screenshot({ path: path.join(screenshotDir, '03-vendor-scanned-counter.png'), fullPage: true });
 
   await customer.getByLabel('Enter amount').fill('23.50');
@@ -235,9 +275,8 @@ test('scan, pending, verified payment, and abandoned order lifecycle', async ({ 
   await customer.addStyleTag({ content: '.token-value { visibility: hidden !important; }' });
   await customer.screenshot({ path: path.join(screenshotDir, '05-customer-token-redacted.png'), fullPage: true });
 
-  await dashboard.reload();
   const pendingRow = dashboard.getByTestId(`pending-order-${primaryOrder.id}`);
-  await expect(pendingRow).toBeVisible();
+  await expect(pendingRow).toBeVisible({ timeout: 8_000 });
   await expect(pendingRow.getByText('Waiting')).toBeVisible();
   const amberBorder = await pendingRow.locator('.order-row').evaluate((element) => getComputedStyle(element).borderLeftColor);
   expect(amberBorder).toBe('rgb(122, 69, 0)');
@@ -266,6 +305,7 @@ test('scan, pending, verified payment, and abandoned order lifecycle', async ({ 
   }
   await expect(checkout.getByRole('heading', { name: 'Verified' })).toBeVisible({ timeout: 8_000 });
   await expect(customer.getByRole('heading', { name: 'Verified' })).toBeVisible({ timeout: 8_000 });
+  await expect(customer.getByTestId('customer-order-id')).toHaveText(primaryOrder.orderCode);
   await dashboard.waitForFunction((orderId) => Boolean(document.querySelector(`[data-testid="paid-order-${orderId}"]`)),
     primaryOrder.id, { timeout: 8_000 }).catch(async () => {
       const boardResponse = await api.get('/api/vendor/board', {
@@ -285,6 +325,40 @@ test('scan, pending, verified payment, and abandoned order lifecycle', async ({ 
   await customer.addStyleTag({ content: '.token-value, dd.break-all { visibility: hidden !important; }' });
   await customer.screenshot({ path: path.join(screenshotDir, '09-customer-verified.png'), fullPage: true });
 
+  await dashboard.getByLabel('Enter token or order ID').fill(primaryOrder.orderCode);
+  await dashboard.getByRole('button', { name: 'Check' }).click();
+  await expect(dashboard.getByTestId('quick-check-result').getByText(`Order ID: ${primaryOrder.orderCode}`)).toBeVisible();
+
+  await customer.goto(`${frontendUrl}/o/${primaryOrder.orderCode}`);
+  const statusToken = customer.getByTestId('customer-token');
+  await expect(statusToken).toBeVisible();
+  const statusTokenIsShortQueueCode = await statusToken.evaluate((element) => /^[A-Z][2-9]{2,3}$/.test(element.textContent.trim()));
+  expect(statusTokenIsShortQueueCode).toBe(true);
+  await customer.screenshot({ path: path.join(screenshotDir, '09b-customer-order-id-and-token.png'), fullPage: true });
+
+  await customer.goto(`${frontendUrl}/v/${vendor.slug}`);
+  await customer.getByLabel('Enter amount').fill('19.50');
+  const slowOrderResponse = customer.waitForResponse((response) =>
+    response.request().method() === 'POST' && response.url().includes('/api/orders/create'));
+  await customer.getByRole('button', { name: 'Pay now' }).click();
+  const slowOrderHttpResponse = await slowOrderResponse;
+  if (!slowOrderHttpResponse.ok()) throw new Error('Slow-payment order creation failed.');
+  const slowOrder = await slowOrderHttpResponse.json();
+  await expect(dashboard.getByTestId(`pending-order-${slowOrder.id}`)).toBeVisible({ timeout: 8_000 });
+  await customer.getByRole('button', { name: 'Open UPI app' }).click();
+  await customer.waitForFunction(() => Boolean(window.__openedCheckoutUrl));
+  const slowCheckoutPath = await customer.evaluate(() => new URL(window.__openedCheckoutUrl).pathname);
+  const slowCheckout = await context.newPage();
+  await slowCheckout.goto(`${frontendUrl}${slowCheckoutPath}`);
+  await slowCheckout.getByText('Demo Controls ▼').click();
+  await slowCheckout.getByRole('button', { name: /Slow Pay/ }).click();
+  await expect(customer.getByRole('heading', { name: 'Late payment' })).toBeVisible({ timeout: 12_000 });
+  await expect(dashboard.getByTestId(`all-order-${slowOrder.id}`).getByText('Late payment')).toBeVisible({ timeout: 12_000 });
+  const slowStatus = await api.get(`/api/orders/${slowOrder.orderCode}/status`);
+  if (!slowStatus.ok() || (await slowStatus.json()).status !== 'LATE_PAID') {
+    throw new Error('Five-second mock slow payment did not produce the expected server-classified late payment under the five-second test expiry.');
+  }
+
   for (let index = 0; index < 20; index++) {
     const orderResponse = await api.post('/api/orders/create', {
       data: { vendorSlug: vendor.slug, amount: 80 + index },
@@ -303,8 +377,10 @@ test('scan, pending, verified payment, and abandoned order lifecycle', async ({ 
       order.id, { timeout: 8_000 });
     samples.push(Math.max(0, Date.now() - Number(webhookResult.webhook_received_at_ms)));
   }
-  const voiceWorked = await dashboard.evaluate(() => window.__spokenAnnouncements.some((text) => text.startsWith('Payment received:')));
-  expect(voiceWorked).toBe(true);
+  const friendlyAnnouncement = await dashboard.evaluate(() => window.__spokenUtterances.find((utterance) => utterance.text.startsWith('Good news.')));
+  expect(friendlyAnnouncement.lang).toBe('en-IN');
+  expect(friendlyAnnouncement.rate).toBeCloseTo(0.94, 2);
+  expect(friendlyAnnouncement.pitch).toBeCloseTo(1.04, 2);
 
   await customer.goto(`${frontendUrl}/v/${vendor.slug}`);
   await expect(customer.getByRole('heading', { name: 'E2E Vendor' })).toBeVisible();

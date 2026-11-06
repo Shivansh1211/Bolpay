@@ -1,5 +1,29 @@
 # Changelog
 
+- Replaced the misleading registration evidence with a new screenshot generated using clearly fictional test phone/UPI data, and aligned browser, API, smoke, and attack fixtures with that test-data convention.
+- Added a repository note that vendor names, phone numbers, and UPI IDs are fictional, and removed phone numbers and order codes from backend informational logs.
+- Added a GitHub Actions CI workflow with read-only repository permissions, SHA-pinned actions, dependency caches, disposable generated test credentials, full-history Gitleaks, and short-retention evidence artifacts.
+- Set Render web services to deploy after GitHub CI checks, refreshed Vercel's duplicate schema config, and documented production-only previews and exact deployment handoff steps.
+- Replaced the API documentation's token example with an invalid placeholder and documented the reviewed historical Gitleaks false positive in `.gitleaksignore`.
+- Added bounded asynchronous post-expiry risk scoring and the configurable three-timeout rule fallback; scoring paths do not update payment status.
+- Added typed numeric-only ML requests with API-key authentication, a 500 ms timeout, hashed-device window features, and scorer/model metadata for persisted review flags.
+- Wired the same dashboard-entered `ML_API_KEY` to both Render backend and ML services and documented the two-service setup.
+- Exposed persisted risk review notes on the vendor board with “look at this order” wording, refreshed by a vendor-scoped WebSocket event.
+- Rebuilt synthetic-data generation/evaluation with a fixed seed, Isolation Forest, Random Forest, timeout-rule baseline, FPR, ROC-AUC, and confusion-matrix output; Random Forest beats the rule baseline by F1 only on the generated synthetic split.
+- Updated the empty-database smoke assertion and its success text for V8, and exercised the scoring HTTP timeout using a delayed local endpoint fixture.
+
+- Add a Render Free Blueprint for backend, ML, mock checkout, and Postgres; run web containers as non-root, bake the ML model, and tune the backend JVM for 512 MiB.
+- Protect ML routes with an API key, wire public Render service URLs, require hosted invite codes, and keep demo OTP disabled unless explicitly enabled with an invite code configured.
+- Configure Vite/Vercel production API, WSS, mock checkout, and QR origins, with SPA rewrites for refreshable customer/vendor links.
+- Add local warm-up and remote security/payment smoke scripts plus phone-test, backup, rollback, free-tier, and manual deployment instructions.
+- Cap local backend Compose memory at 512 MiB; the completed end-to-end flow used 212 MiB after the final run, while the ML health endpoint confirmed the baked model loaded.
+- Make vendor voice announcements warmer and more conversational in English and Hindi, prefer matching installed Indian voices, and speak distinct guidance for late or unconfirmed payments.
+- Return the short queue token from the public order-status API and make it the prominent paid-screen code for customers to tell vendors; keep Order ID as a secondary lookup reference.
+- Publish vendor-scoped scan and pending-order WebSocket events; add customer-facing Order ID verification and improve the local mock checkout styling.
+- Restore the local backend's 150-second expiry after successful test runs; correct the delayed mock payment callback and null paidAt quick-check response. Latest full gate remains blocked at a duplicated Order ID line in the quick-check result.
+- Return actionable registration conflicts for already-used shop links/phone numbers; recover with a fresh OTP and cover the duplicate-link retry through the UI.
+- Keep the attack suite's registration configuration explicit and independent of the host's invite-code environment.
+- Fixed the vendor QR page to load the signed-in vendor profile and added browser coverage for QR content and rendering.
 - Added a unified PowerShell test entry point for Compose validation, backend Maven tests, and Step 1 end-to-end smoke checks.
 - Enforced HMAC webhook verification, required payload fields, amount matching, and unique-event idempotency; added an additive OTP hash column widening migration.
 - Required verified OTP proof for vendor registration, removed OTP values from default responses/logs, added OTP throttling, and exposed vendor public DTOs without phone or UPI identifiers.
@@ -56,3 +80,5 @@
 - Triaged every advisory in the current npm audit; deferred only major-version updates and documented package reach and rationale.
 - Recorded the login/register redesign diff review and confirmed auth fields and navigation were preserved; restored localized security guidance.
 - Replaced the hand-drawn BolPay wordmark with Noto Sans Bold SVG path outlines and recorded the OFL source and conversion hash.
+- Corrected stale compliance, limitations, and test-report entries to match the latest ML, screenshot, Maven, Playwright, and latency evidence.
+- Removed order references from paid, late-paid, and expiry backend log messages after the full-gate output audit found them.

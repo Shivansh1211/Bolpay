@@ -1,80 +1,123 @@
-# Deployment preparation
+# Deployment preparation: Vercel + Render Free
 
-Status: **prepared, not deployed**. No hosting provider, domain, payment account, or SMS provider has been selected. This document does not claim that the app is ready for live payments.
+This is a deployment recipe only. No provider account has been accessed, no cloud resources have been created, and no deployment has been run. Render Free is suitable for a temporary demo, not durable production: free web services sleep after 15 minutes without inbound requests and take about a minute to wake; there are 750 shared free instance hours per workspace/month. Free Postgres is limited to 1 GB and expires 30 days after creation, with a 14-day upgrade grace period; it has no managed backups. Do not add keep-alive pingers. Warm services only before a demo. Check current workspace usage before creating anything. [Render Free limits](https://render.com/docs/free)
 
-## Proposed split
+Render's Blueprint syntax below follows its current `render.yaml` reference (`runtime: docker`, `plan: free`, `healthCheckPath`, `fromDatabase`, `fromService`, `sync: false`, `generateValue`, and `autoDeployTrigger: checksPass`). The three web services and database are pinned to Singapore so they share a region. Free services cannot receive private network traffic, so backend-to-mock calls and mock-to-backend callbacks use the services' public HTTPS URLs (`RENDER_EXTERNAL_URL`); Postgres uses its private connection string. Each web service is configured to auto-deploy only after linked GitHub CI checks pass. [Blueprint reference](https://render.com/docs/blueprint-spec), [Docker deploys](https://render.com/docs/docker), [Render default environment variables](https://render.com/docs/environment-variables)
 
-- **Frontend:** Vercel static hosting with the project root set to `frontend`, framework preset Vite, build command `npm run build`, and output directory `dist`. `frontend/vercel.json` sends application routes to `index.html`, including `/v/{slug}` and `/o/{code}` when refreshed.
-- **Backend, PostgreSQL, ML, and optional mock:** a Docker-capable host. Options to evaluate are a small managed Docker/container service with private service networking and persistent disks; a general-purpose VM where Docker Compose and backups are operated by the project owner; or an existing organization-managed Docker host. Each option needs a documented PostgreSQL backup/restore procedure and private networking. No option is selected here.
-- **Payment gateway:** choose sandbox or live configuration only after the owner selects a provider/account and validates the gateway's current webhook signing requirements.
+Vercel builds this Vite SPA from the `frontend` project root. The checked-in `frontend/vercel.json` uses Vercel's documented SPA rewrite to `index.html`, allowing `/v/{slug}` and `/o/{code}` to load after refresh or QR scan. Vite `VITE_*` values are embedded at build time and must be set before a new production deployment. [Vite on Vercel](https://vercel.com/docs/frameworks/frontend/vite), [Vercel environment variables](https://vercel.com/docs/environment-variables)
 
-`docker-compose.production.yml` is a starting template. It keeps the database, backend, and ML service on a private Compose network and publishes the Nginx frontend only on host loopback. For the split Vercel setup, configure the backend host's TLS reverse proxy to expose only required `/api/` and `/ws` endpoints, and use the Vercel domain as the exact allowed browser origin. Do not expose PostgreSQL or the ML service publicly.
+## Exact setup order
 
-## Build and runtime environment
+1. Push this branch to your **private** Git repository. Review the staged diff first; never include `.env`, test artifacts, OTPs, provider credentials, or local database dumps.
+2. In Render, create a Blueprint from that repository and `render.yaml`. Choose the free plans and Singapore for all services/database. Enter only the prompted `sync: false` secret values in the Render dashboard. Render generates the shared mock client secret; JWT, webhook, ML API, mock-admin and invite secrets are entered by you. During this first deployment the backend CORS and public base URL intentionally point to `https://SET-AFTER-VERCEL-DEPLOY`; replace them after Vercel creates its production URL.
+3. In Render, note the public HTTPS URLs for `bolpay-backend`, `bolpay-ml-service`, and `bolpay-mock-cashfree`. Confirm each `/health` returns HTTP 200. Do not paste URLs containing credentials; service URLs have no credentials.
+4. Create a Vercel project connected to the same private repository. Set **Root Directory** to `frontend`, framework preset Vite, build command `npm run build`, output directory `dist`. Add the Vercel environment values in the table below and deploy. Record the production origin, such as `https://your-project.vercel.app`.
+5. In Render, set backend `CORS_ALLOWED_ORIGINS` to exactly that production origin (no trailing slash, no preview domains) and backend `PUBLIC_BASE_URL` to the same origin. Redeploy the backend. `PUBLIC_BASE_URL` is used for customer return links; Vercel `VITE_PUBLIC_BASE_URL` is the compile-time equivalent used to encode QR URLs. Keep both equal. Set Vercel `VITE_API_BASE_URL`, `VITE_WS_URL`, and `VITE_MOCK_URL` to the recorded Render URLs and redeploy Vercel if those values were not available at its first build. `VITE_WS_URL` is entered as `wss://<backend-host>/ws`; the client converts that base to HTTPS for SockJS negotiation, which uses WSS for its WebSocket transport and keeps HTTPS fallback transports available.
+6. Before a demo, run `tests/warmup.ps1` with the four public URLs, then `tests/remote-smoke.ps1` with those URLs. For the remote registration test only, temporarily enable `DEMO_OTP=true` in Render after `INVITE_CODE` is set; the app labels the returned code as `demo login`. Turn `DEMO_OTP` back off and redeploy after the smoke test. Production OTP delivery is not configured, so ordinary OTP login is not usable until a delivery provider is implemented and configured.
 
-Configure Vercel build variables in the project settings. Keep backend credentials in the Docker host's secret manager. Values below are names and purposes only; this document contains no credentials.
+### CI-gated Render deploys and Vercel previews
 
-| Variable | Where | Purpose / setting |
+- `render.yaml` sets `autoDeployTrigger: checksPass` on the backend, ML and mock web services. Render's current Blueprint specification supports `checksPass`; in the Render Dashboard, confirm each Git-linked service is set to deploy **After CI Checks Pass** and that the required GitHub checks report success. Initial Blueprint creation still provisions the services, and later commits wait for checks.
+- Vercel creates Preview deployments for non-production branches by default. This app's safe default is production-only builds: in **Project Settings → Build and Deployment → Ignored Build Step**, select **Only build production**. Keep backend CORS limited to the production Vercel origin. If you later want a preview, assign one stable branch-specific preview domain, add only that exact origin to `CORS_ALLOWED_ORIGINS`, configure separate Preview `VITE_*` values deliberately, and remove the origin after testing. Never use a wildcard CORS origin. [Render deploy triggers](https://render.com/docs/deploys), [Vercel Git deployments](https://vercel.com/docs/git), [Vercel project settings](https://vercel.com/docs/project-configuration/project-settings)
+
+The frontend directly opens the public mock URL for checkout. Browser payment controls call the mock service on that same origin; the mock signs callbacks and sends them to the public backend URL. Backend service credentials are sent only server-to-server. The mock admin panel and ML API are independently protected. Mock orders are in process memory and disappear on restart/sleep/redeploy, so create and complete demo orders while that service is awake. These are demonstration services; this configuration does not connect a real payment processor or SMS provider.
+
+## Environment variables
+
+Set secrets in provider dashboards only. The names below describe ownership and exposure; never place secret values in source control or test output.
+
+| Variable | Service | Secret? | Set by / purpose |
+|---|---|---:|---|
+| `DATABASE_URL` | Render backend | Yes | Blueprint reference to Postgres private connection string; entrypoint converts `postgresql://` to JDBC form without printing it. |
+| `POSTGRES_USER`, `SPRING_DATASOURCE_PASSWORD` | Render backend | Yes | Blueprint references to generated database user/password. |
+| `JWT_SECRET` | Render backend | Yes | Enter a randomly generated, high-entropy value through the dashboard prompt; keep it stable across restarts. |
+| `CASHFREE_WEBHOOK_SECRET` | backend + mock | Yes | Enter through the dashboard prompt on backend; mock receives it through a service reference. This is a mock signing key, not a real gateway credential. |
+| `CASHFREE_CLIENT_ID` | backend + mock | No | Blueprint value shared with mock for its server-to-server API. |
+| `CASHFREE_CLIENT_SECRET` | backend + mock | Yes | Render generates it on backend and references it in mock. |
+| `CASHFREE_BASE_URL` | backend | No | Render service reference to the mock's public `RENDER_EXTERNAL_URL`. |
+| `BACKEND_URL` | mock | No | Render service reference to backend's public `RENDER_EXTERNAL_URL` for callbacks. |
+| `ML_SERVICE_URL` | backend | No | Render service reference to the ML public URL. The backend currently does not call the ML service; this is configured for the existing property only. |
+| `ML_API_KEY` | Backend and ML service | Yes | Enter the same secret in both Render services' `sync: false` prompts; backend sends it as `X-API-Key`, and ML requires it on all routes except `/health`. |
+| `MOCK_ADMIN_PASSWORD` | mock | Yes | Enter using Render's `sync: false` prompt; Basic authentication protects `/mock-admin` and `/admin/attack/*`. |
+| `INVITE_CODE` | backend | Yes | Enter using Render's `sync: false` prompt; required to register when set. Leave it unavailable to users except the intended invitees. |
+| `DEMO_OTP` | backend | No | Default `false`. Only turn on temporarily for a demo when `INVITE_CODE` is configured; returned OTP is labelled `demo login`. |
+| `OTP_RETURN_TO_CLIENT` | backend | No | Must remain `false` on hosted deployments; retained for local automated test setup. |
+| `PAYMENT_GATEWAY` | backend | No | Blueprint sets `mock`; the mock is not a real payment processor. |
+| `PUBLIC_BASE_URL` | backend | No | Set to the exact Vercel production origin after first Vercel deploy; return links. |
+| `CORS_ALLOWED_ORIGINS` | backend | No | Set to that same single production origin only. Do not add Vercel preview origins unless separately requested. |
+| `EXPIRE_AFTER` | backend | No | Blueprint uses 150 seconds for demo orders. |
+| `VITE_API_BASE_URL` | Vercel production build | No | `https://<bolpay-backend-host>`; API origin. |
+| `VITE_WS_URL` | Vercel production build | No | `wss://<bolpay-backend-host>/ws`; authenticated live board socket. |
+| `VITE_MOCK_URL` | Vercel production build | No | `https://<bolpay-mock-cashfree-host>`; public customer checkout origin. Never use Render's private hostname. |
+| `VITE_PUBLIC_BASE_URL` | Vercel production build | No | Exact production Vercel origin; QR cards encode `/v/{slug}` on this origin. |
+
+Render's `sync: false` values are requested during initial Blueprint creation and must be added manually in the dashboard if introduced on later Blueprint syncs. Blueprint-generated values and service/database references follow Render's current behavior. [Render env vars and secrets](https://render.com/docs/configure-environment-variables)
+
+## Flyway and database lifecycle
+
+Spring Boot starts Flyway against the empty database on initial backend boot (`spring.flyway.enabled: true`) before Hibernate validates the schema. Confirm the first backend logs show migrations applied and `/health` passes. A migration failure should leave the deployment unhealthy; inspect the error and fix forward before retrying. Do not delete the database or alter an applied migration.
+
+Free Postgres has no Render-managed backups and expires 30 days after creation. Make and verify an external backup early, then repeat before the expiry date. Download the external Postgres connection string from the Render dashboard into a local environment variable without echoing it. Example in PowerShell (from a trusted machine with PostgreSQL client tools):
+
+```powershell
+$env:PGCONNECT_TIMEOUT = '15'
+pg_dump --format=custom --no-owner --file=bolpay-backup.dump $env:RENDER_EXTERNAL_DATABASE_URL
+pg_restore --list bolpay-backup.dump
+```
+
+For a restore, create a **separate** compatible PostgreSQL database, set its connection string in the same environment variable, then run:
+
+```powershell
+pg_restore --clean --if-exists --no-owner --dbname=$env:RENDER_EXTERNAL_DATABASE_URL bolpay-backup.dump
+```
+
+The dump contains customer/vendor/order data and must be stored encrypted with restricted access. Test restore before relying on it. Do not run restore against the only live database. Follow the database provider's current connection/TLS instructions and check `pg_dump` client major-version compatibility.
+
+## Warm-up and remote smoke
+
+Run only shortly before a demo; requests keep free services active and count toward shared workspace usage.
+
+```powershell
+pwsh -NoProfile -File tests/warmup.ps1 `
+  -FrontendUrl 'https://<vercel-origin>' `
+  -BackendUrl 'https://<backend-host>' `
+  -MockUrl 'https://<mock-host>' `
+  -MlUrl 'https://<ml-host>'
+
+pwsh -NoProfile -File tests/remote-smoke.ps1 `
+  -FrontendUrl 'https://<vercel-origin>' `
+  -BackendUrl 'https://<backend-host>' `
+  -MockUrl 'https://<mock-host>' `
+  -MlUrl 'https://<ml-host>'
+```
+
+The second script asks for the invite code without echoing it. It uses the explicit demo OTP response to create a synthetic test vendor/order, exercises the public mock checkout and signed callback, and checks unauthorized paths and WebSocket auth. It prints check names and PASS/FAIL only; it never prints OTPs, invite codes, JWTs, or secret headers. It leaves one synthetic vendor and order in the database. The REST `/health` checks do not keep a service awake indefinitely.
+
+## Common failures and recovery
+
+| Symptom | Likely cause | Fix |
 |---|---|---|
-| `VITE_PUBLIC_BASE_URL` | Vercel build | Public frontend HTTPS origin, used to render vendor QR links. |
-| `VITE_API_URL` | Vercel build | HTTPS origin of the backend API, e.g. `https://api.example.invalid`; no trailing `/api` because the client adds route paths. |
-| `VITE_WS_URL` | Vercel build | HTTPS SockJS endpoint, e.g. `https://api.example.invalid/ws`. SockJS starts over HTTPS and negotiates the secure WebSocket (`wss`) transport through the proxy. Do not put a raw `wss://` URL here unless the client library is changed and verified. |
-| `PUBLIC_BASE_URL` | Backend | Exact frontend HTTPS origin used for return links. |
-| `CORS_ALLOWED_ORIGINS` | Backend | Exactly the Vercel frontend origin, with no wildcard or unrelated origins. Apply the same allowed-origin policy to the WebSocket handshake. |
-| `POSTGRES_DB` | Backend/DB | Database name. |
-| `POSTGRES_USER` | Backend/DB | Database user; use a dedicated least-privilege account. |
-| `POSTGRES_PASSWORD` | Backend/DB secret | Unique database password from the host secret manager. |
-| `SPRING_DATASOURCE_PASSWORD` | Backend | Set by the Compose template from `POSTGRES_PASSWORD`; do not duplicate it in source control. |
-| `JWT_SECRET` | Backend secret | Unique random secret of at least 256 bits. Replace the development fallback. |
-| `PAYMENT_GATEWAY` | Backend | Explicitly select a configured sandbox/live gateway. The production template refuses to guess. |
-| `CASHFREE_BASE_URL` | Backend | Gateway API base URL for the selected environment. |
-| `CASHFREE_CLIENT_ID` | Backend secret | Gateway client ID. |
-| `CASHFREE_CLIENT_SECRET` | Backend secret | Gateway client secret. |
-| `CASHFREE_WEBHOOK_SECRET` | Backend secret | Gateway webhook signing secret. |
-| `CASHFREE_API_VERSION` | Backend (optional) | Gateway API version; current application default is `2025-01-01`, verify against the selected gateway account. |
-| `ML_SERVICE_URL` | Backend | Internal URL, normally `http://ml-service:5000`; do not use a public URL. |
-| `TRUSTED_PROXIES` | Backend (optional) | Only the exact trusted reverse-proxy addresses, after confirming what source addresses the host presents. |
-| `FRONTEND_HTTP_PORT` | Compose host (optional) | Loopback-only local frontend port for a same-host TLS proxy. |
-| `OTP_RETURN_TO_CLIENT` | Backend | Must remain `false` outside explicit local development. |
-| `MOCK_ADMIN_PASSWORD` | Mock service only | If the mock service is enabled for a controlled demo, set a unique high-entropy password in the host secret store. The mock returns 404 for admin routes when it is unset. Do not use a default, commit it, or expose mock admin routes to the public internet. The production Compose file intentionally does not include the mock service. |
-| `INVITE_CODE` | Backend secret/config | Optional registration gate. When set, registration requires the code in the registration form; store it in the Docker host secret manager and share it only with intended invitees. When unset, vendor registration remains open. It is not a substitute for verified identity or production SMS. |
+| Render Blueprint rejects `render.yaml` | Unsupported plan/region field or YAML indentation | Compare the error with the linked Blueprint schema; keep all resources in one available region and re-run local YAML validation. |
+| Render does not deploy a pushed commit | `checksPass` is waiting for required GitHub checks or a check failed | Open the repository Actions/Checks view, fix the failing job, and confirm all expected checks complete successfully. Do not switch to deploy-on-commit to bypass CI. |
+| Backend health stays red or Flyway fails | Missing/incorrect database references, cold database, or migration/schema mismatch | Inspect startup logs for the first Flyway/connection error; verify internal `DATABASE_URL`, DB user/password references, and region. Apply a reviewed forward fix; never edit an applied migration. |
+| Vercel `/v/...` or `/o/...` returns 404 | Wrong Vercel project root or missing rewrite | Set Root Directory to `frontend`; verify `frontend/vercel.json` was included and redeploy. |
+| Browser API calls fail with CORS | Wrong or trailing-slash origin, or stale frontend build | Set backend CORS to exactly the Vercel production origin, set the matching Vite API URL, redeploy backend and rebuild Vercel. |
+| Vendor board stays offline | `VITE_WS_URL` missing/wrong, JWT rejected, or backend waking | Use `wss://<backend>/ws`; inspect browser console and backend socket auth logs; warm backend and retry login. Never relax topic authorization. |
+| Checkout page is blank/404 | `VITE_MOCK_URL` is missing or mock still waking | Set the public HTTPS mock URL in Vercel and rebuild; warm the mock before the demo. Do not use an internal Docker/Render hostname in browser code. |
+| Mock says invalid client or webhook rejected | Backend/mock shared credentials differ or backend URL is stale | Check Blueprint references; sync the Blueprint and redeploy both services. Do not print the secret while debugging. |
+| ML returns 401 | Missing/wrong `X-API-Key` | Use the ML key only in server-to-server calls. Never expose it as a Vite variable. |
+| OTP response contains no code | `DEMO_OTP` is off | Expected hosted default. Production OTP delivery is not implemented. For the smoke test only, set `DEMO_OTP=true` with `INVITE_CODE` set, then turn it off again. |
+| First request takes about a minute or times out | Render Free service slept after 15 minutes | Run warm-up before a demo and wait for each `healthy` result. Do not add an external pinger. |
+| Database is expired, unreachable, or near 30 days | Free Postgres lifecycle limit | Restore the encrypted dump to a new database and update the Blueprint reference; before expiry either export data or manually choose an affordable durable database plan. |
 
-The app does not yet integrate SMS delivery; production OTP delivery must be selected and implemented before real vendor registration. The login/register pages also have local-demo OTP presentation paths, so verify the non-dev production build and responses before inviting users.
+## Rollback
 
-## WebSocket and origin configuration
+1. Stop sharing the QR/link and note the current source commit and deployment identifiers.
+2. Roll Vercel back to the last working frontend deployment, or redeploy its prior reviewed commit.
+3. Roll Render backend/mock/ML to the last known-good deploys using Render's dashboard. Check that Blueprint-linked service URLs and generated secrets remain consistent.
+4. Preserve the database. Do not roll back by deleting it or editing applied migrations. If a schema change is incompatible, restore the verified dump to a separate database and point a reviewed backend deployment at that copy.
+5. Re-run health checks, the remote smoke flow, customer status lookup, and live vendor board before sharing the QR again.
 
-Set the frontend API base to the backend's HTTPS origin and the SockJS endpoint to `https://<backend-host>/ws`. The TLS reverse proxy must pass the SockJS HTTP requests and WebSocket upgrade, forward `Upgrade` and `Connection` headers, and use a read timeout long enough for active board sessions. Browsers negotiate WSS from the HTTPS SockJS URL. Confirm the backend only accepts the selected frontend origin and its STOMP CONNECT still requires a valid JWT; do not widen topic authorization.
+## Boundaries and known gaps
 
-The current production Nginx file assumes frontend and backend share a Compose network. Vercel is a separate origin, so a Docker-host reverse proxy or ingress must provide the public backend TLS endpoint and forward `/api/` and `/ws` to the private backend. Do not place a wildcard CORS rule in the frontend proxy as a workaround.
-
-## Cold starts and service availability
-
-Some container hosts may pause an idle service. The current app has generic loading states; it does not implement a dedicated “Waking up the server…” message or a tested retry/backoff flow. Before using a host that can sleep, add a user-visible waking state, retry safely for idempotent reads, and explain when the user should try again. Do not automatically resubmit payment creation or OTP requests on retries. Test cold start from a real phone before opening traffic.
-
-## Manual deployment checklist
-
-- [ ] Choose the frontend and Docker-hosting options; set a domain and DNS/TLS plan.
-- [ ] Configure the Vercel project root as `frontend`; build with `npm run build` and publish `dist`.
-- [ ] Set Vercel `VITE_PUBLIC_BASE_URL`, `VITE_API_URL`, and `VITE_WS_URL` to the final HTTPS origins; verify refresh on `/v/{slug}` and `/o/{code}`.
-- [ ] Configure host secrets; replace all development credentials and use distinct production secrets. Never paste them into Git or logs.
-- [ ] Set `PUBLIC_BASE_URL` to the frontend origin and `CORS_ALLOWED_ORIGINS` to that single exact origin.
-- [ ] Configure the public reverse proxy for TLS, `/api/`, SockJS `/ws`, WebSocket upgrade, forwarded headers, and suitable idle timeout. Keep database, backend, and ML ports private.
-- [ ] Ensure the ML container is reachable only on the internal network; confirm no public route reaches `/score` or `/model-info`.
-- [ ] Decide whether to use mock mode for an isolated staging demo. If enabled, configure `MOCK_ADMIN_PASSWORD` in a secret store and block public admin paths; never treat the mock as a live gateway.
-- [ ] Decide whether registration should be invite-gated. If so, set `INVITE_CODE` in the backend host secret store, share it through a controlled channel, and verify missing/wrong codes are rejected. If unset, anyone can attempt vendor registration. Configure real SMS delivery and confirm OTP values never reach logs or default API responses.
-- [ ] Register the final gateway webhook URL, verify signatures using current provider documentation, and test duplicate, stale, malformed, wrong-amount, and delayed events in sandbox.
-- [ ] Take a PostgreSQL backup and prove restore to a separate database before the first release.
-- [ ] Run `pwsh -NoProfile -File tests/run-all.ps1`, then stage the release and inspect server/browser logs for secrets and tokens.
-- [ ] On a real phone, test both a vendor and customer over mobile data, QR scanning, amount confirmation, paid/expired/late states, screen brightness, reconnect after temporary network loss, and Hindi/English. Record device, browser, host, and outcome by hand.
-- [ ] Conduct the vendor survey by hand; it has not been performed.
-
-## Rollback plan
-
-1. Before release, record the exact source commit and image digests, retain the previous frontend build and backend image, and take a verified PostgreSQL backup.
-2. If a release causes errors, stop new traffic at the edge and switch Vercel to the previous frontend build; restore the previous backend image through the host's normal rollout mechanism.
-3. Keep the database volume intact. Do not delete a volume or edit an applied migration as a rollback technique. Prefer backward-compatible expand/contract migrations. If the prior backend cannot read the migrated schema, stop traffic and restore the backup to a separate database for a reviewed recovery; do not overwrite the only current database copy.
-4. Verify health, login, order lookup, and WebSocket board update on the recovered version before reopening traffic. Record the incident, database state, and recovery decision.
-
-## What remains manual or incomplete
-
-The hosting provider and payment account choice require the owner. Deployment, real-phone testing, and the vendor survey have not happened. `INVITE_CODE` is supported but optional; leaving it unset permits open registration. Production SMS remains absent. The dedicated cold-start message/retry behavior is also absent. This document is preparation only and makes no production-readiness or scam-prevention claim.
+No deployment or provider account action has occurred. No real SMS provider, live gateway, production payments, real-phone test, or vendor survey is included. Free Render services are single-instance, 512 MB / 0.1 CPU, sleep when idle, and share workspace limits; four free web services plus Vercel may not fit workspace/build/bandwidth quotas. If the dashboard requires a card, changes terms, or presents a paid plan, stop; this recipe assumes a $0/no-card path and does not authorize billing. Service URLs and current free plan availability should be checked in the dashboards before applying the Blueprint. The demo is not production-ready and makes no scam-prevention claim.

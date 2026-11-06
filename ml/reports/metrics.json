@@ -1,0 +1,75 @@
+{
+  "seed": 42,
+  "total_samples": 6000,
+  "test_samples": 1200,
+  "synthetic_positive_rate": 0.16666666666666666,
+  "features": [
+    "seconds_to_first_attempt",
+    "time_pending",
+    "expired_orders_per_device_1h",
+    "expired_orders_per_device_24h",
+    "timeouts_per_device_15m",
+    "pending_orders_per_vendor_10m",
+    "amount_z_score",
+    "hour_of_day",
+    "repeat_order_gap_seconds",
+    "bulk_orders_per_device_10m"
+  ],
+  "metrics": {
+    "isolation_forest": {
+      "precision": 0.9854014598540146,
+      "recall": 0.675,
+      "f1": 0.8011869436201781,
+      "false_positive_rate": 0.002,
+      "roc_auc": 0.9976349999999999,
+      "confusion_matrix": [
+        [
+          998,
+          2
+        ],
+        [
+          65,
+          135
+        ]
+      ]
+    },
+    "random_forest": {
+      "precision": 1.0,
+      "recall": 0.99,
+      "f1": 0.9949748743718593,
+      "false_positive_rate": 0.0,
+      "roc_auc": 1.0,
+      "confusion_matrix": [
+        [
+          1000,
+          0
+        ],
+        [
+          2,
+          198
+        ]
+      ]
+    },
+    "rule_baseline": {
+      "precision": 1.0,
+      "recall": 0.79,
+      "f1": 0.8826815642458101,
+      "false_positive_rate": 0.0,
+      "roc_auc": 0.895,
+      "confusion_matrix": [
+        [
+          1000,
+          0
+        ],
+        [
+          42,
+          158
+        ]
+      ]
+    }
+  },
+  "best_ml_by_f1": "Random Forest",
+  "ml_beats_rule_by_f1": true,
+  "conclusion": "Random Forest beats the rule baseline by F1 on this synthetic split.",
+  "limitation": "All labels and patterns are synthetic; these metrics do not establish real-world performance."
+}

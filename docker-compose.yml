@@ -16,6 +16,7 @@ services:
     networks: [internal]
 
   backend:
+    mem_limit: 512m
     build:
       context: ./backend
       dockerfile: Dockerfile
@@ -42,6 +43,7 @@ services:
       TRUSTED_PROXIES: ${TRUSTED_PROXIES:-}
       PUBLIC_BASE_URL: ${PUBLIC_BASE_URL:-http://localhost:5173}
       ML_SERVICE_URL: http://ml-service:5000
+      ML_API_KEY: ${ML_API_KEY:-}
     depends_on:
       postgres:
         condition: service_healthy
@@ -55,8 +57,7 @@ services:
     # Internal network only - not exposed publicly
     environment:
       FLASK_ENV: development
-    volumes:
-      - ./ml-service:/app
+      ML_API_KEY: ${ML_API_KEY:-}
     networks: [internal]
 
   mock-cashfree:

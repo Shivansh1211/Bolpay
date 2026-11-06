@@ -83,7 +83,7 @@ POST /api/auth/send-otp
 Content-Type: application/json
 
 {
-  "phoneNumber": "9876543210"
+  "phoneNumber": "9000000000"
 }
 ```
 
@@ -97,8 +97,8 @@ POST /api/auth/verify-otp
 Content-Type: application/json
 
 {
-  "phoneNumber": "9876543210",
-  "otpCode": "123456"
+  "phoneNumber": "9000000000",
+  "otpCode": "<local demo code>"
 }
 ```
 
@@ -107,7 +107,7 @@ Verifies OTP and returns JWT token.
 **Response:**
 ```json
 {
-  "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+  "token": "FAKE_NOT_A_JWT",
   "vendorId": 1
 }
 ```

@@ -100,7 +100,8 @@ const VendorPage = () => {
     setError('');
     setCreating(true);
     try {
-      const response = await orderAPI.create({ vendorSlug: slug, amount: parseFloat(amount) });
+      const deviceId = localStorage.getItem('bolpay_device_id');
+      const response = await orderAPI.create({ vendorSlug: slug, amount: parseFloat(amount), deviceId });
       setOrder(response.data);
       setTimeLeft(Math.max(0, Math.floor((new Date(response.data.expiresAt) - Date.now()) / 1000)));
       window.setTimeout(() => openCheckout(response.data), 500);
@@ -113,8 +114,13 @@ const VendorPage = () => {
 
   const openCheckout = (checkoutOrder = order) => {
     if (!checkoutOrder?.paymentSessionId) return;
-    const publicBaseUrl = import.meta.env.VITE_PUBLIC_BASE_URL || window.location.origin;
-    window.open(`${publicBaseUrl}/checkout/${checkoutOrder.paymentSessionId}`, '_blank', 'noopener');
+    const localDemoHost = ['localhost', '127.0.0.1', 'frontend'].includes(window.location.hostname);
+    const publicMockUrl = import.meta.env.VITE_MOCK_URL || (localDemoHost ? window.location.origin : '');
+    if (!publicMockUrl) {
+      setError('checkoutUnavailable');
+      return;
+    }
+    window.open(`${publicMockUrl.replace(/\/$/, '')}/checkout/${checkoutOrder.paymentSessionId}`, '_blank', 'noopener');
   };
 
   if (loading) {
@@ -198,14 +204,15 @@ const VendorPage = () => {
 
             <span className="field-label">{t('amount')}</span>
             <p className="amount-value mb-5">₹{order.amount}</p>
-            <span className="field-label">{t('token')}</span>
+            <span className="field-label">{state === 'paid' ? t('customerToken') : t('token')}</span>
             <p className="token-value">{order.token}</p>
+            {state === 'paid' && <p className="mb-4 text-small font-semibold">{t('tellVendorToken')}</p>}
 
             {state === 'paid' ? (
-              <dl className="grid grid-cols-2 gap-4 border-t border-gray-300 pt-4">
+              <div className="border-t border-gray-300 pt-4"><p className="text-small font-semibold">{t('showOrderId')}</p><dl className="grid grid-cols-2 gap-4 mt-3">
                 <div><dt className="field-label">{t('verifiedAt')}</dt><dd>{orderStatus?.paidAt ? new Date(orderStatus.paidAt).toLocaleTimeString() : '—'}</dd></div>
-                <div><dt className="field-label">{t('reference')}</dt><dd className="break-all">{order.orderCode}</dd></div>
-              </dl>
+                <div><dt className="field-label">{t('orderId')}</dt><dd className="break-all font-bold" data-testid="customer-order-id">{order.orderCode}</dd></div>
+              </dl></div>
             ) : state === 'expired' ? (
               <p className="border-t border-gray-300 pt-4">{t('askNewToken')}</p>
             ) : (

@@ -21,7 +21,7 @@ class OrderTokenAllocationTest {
                 .thenAnswer(call -> call.<String>getArgument(1).length() == 4
                         ? Optional.empty() : Optional.of(new Order()));
         OrderService service = new OrderService(orders, mock(VendorRepository.class),
-                mock(PaymentGateway.class), mock(SimpMessagingTemplate.class));
+                mock(PaymentGateway.class), mock(SimpMessagingTemplate.class), mock(FraudScoringService.class));
 
         String token = service.allocateActiveToken(42L);
 
@@ -38,7 +38,7 @@ class OrderTokenAllocationTest {
         when(orders.findByVendorIdAndTokenAndStatus(anyLong(), anyString(), eq(Order.OrderStatus.PENDING)))
                 .thenReturn(Optional.empty());
         OrderService service = new OrderService(orders, mock(VendorRepository.class),
-                mock(PaymentGateway.class), mock(SimpMessagingTemplate.class));
+                mock(PaymentGateway.class), mock(SimpMessagingTemplate.class), mock(FraudScoringService.class));
 
         assertTrue(service.allocateActiveToken(42L).matches("[A-HJ-NP-Z][2-9]{2}"));
         verify(orders, never()).findByVendorIdAndTokenAndStatus(

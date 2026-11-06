@@ -131,7 +131,7 @@ class AttackSuite:
             # Send 6 OTP requests (limit is 5 per hour)
             success_count = 0
             for i in range(6):
-                response = requests.post(f"{BASE_URL}/auth/send-otp", json={"phoneNumber": "9999999999"})
+                response = requests.post(f"{BASE_URL}/auth/send-otp", json={"phoneNumber": "9000000000"})
                 if response.status_code == 429:
                     success_count += 1
             
@@ -168,8 +168,8 @@ class AttackSuite:
             xss_payload = "<script>alert('XSS')</script>"
             
             response = requests.post(f"{BASE_URL}/vendors/register", json={
-                "phoneNumber": "9" + "9" * 9,
-                "upiId": "test@upi",
+                "phoneNumber": "9000000001",
+                "upiId": "demo.attack@examplebank",
                 "businessName": xss_payload,
                 "slug": "test-xss"
             })

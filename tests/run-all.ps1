@@ -67,7 +67,7 @@ try {
     }
     if (-not $dbReady) { throw 'Disposable PostgreSQL did not become healthy.' }
     $mountPath = (Resolve-Path 'backend').Path.Replace('\', '/')
-    Invoke-Checked 'docker' @('run', '--rm', '--network', 'bolpay_internal', '--mount', 'type=volume,source=bolpay-maven-cache,target=/root/.m2', '-v', "${mountPath}:/workspace", '-w', '/workspace', '-e', 'SPRING_DATASOURCE_URL=jdbc:postgresql://bolpay-run-all-db:5432/bolpay_test', '-e', 'POSTGRES_USER=bolpay_test', '-e', 'SPRING_DATASOURCE_PASSWORD=bolpay_test_only', '-e', 'JWT_SECRET=local-test-secret-only-012345678901234567890123456789012345678901234567890123456789', 'maven:3.9-eclipse-temurin-17', 'mvn', '-B', '-ntp', 'test')
+    Invoke-Checked 'docker' @('run', '--rm', '--network', 'bolpay_internal', '--mount', 'type=volume,source=bolpay-maven-cache,target=/root/.m2', '-v', "${mountPath}:/workspace", '-w', '/workspace', '-e', 'SPRING_DATASOURCE_URL=jdbc:postgresql://bolpay-run-all-db:5432/bolpay_test', '-e', 'POSTGRES_USER=bolpay_test', '-e', 'SPRING_DATASOURCE_PASSWORD=bolpay_test_only', '-e', 'JWT_SECRET=local-test-secret-only-012345678901234567890123456789012345678901234567890123456789', '-e', 'INVITE_CODE=', 'maven:3.9-eclipse-temurin-17', 'mvn', '-B', '-ntp', 'test')
 } finally {
     docker rm -f $dbName 2>$null | Out-Null
 }
@@ -84,5 +84,18 @@ $artifactMount = (Resolve-Path $artifactDirectory).Path.Replace('\', '/')
 Invoke-Checked 'docker' @('build', '-f', 'tests/e2e/Dockerfile', '-t', $playwrightImage, 'tests/e2e')
 Invoke-Checked 'docker' @('run', '--rm', '--network', 'bolpay_internal', '-e', 'API_URL=http://backend:8080', '-e', 'MOCK_URL=http://mock-cashfree:9000', '-e', 'FRONTEND_URL=http://frontend', '-e', 'PLAYWRIGHT_SCREENSHOT_DIR=/results', '-e', 'PLAYWRIGHT_METRICS_PATH=/results/latency.json', '-v', "${artifactMount}:/results", $playwrightImage)
 Write-Host 'PASS: Playwright customer flow, vendor live board, voice announcement, screenshots, and webhook latency samples'
+
+Write-Host '== Restore manual-test order expiry =='
+$env:OTP_RETURN_TO_CLIENT = 'true'
+$env:EXPIRE_AFTER = '150'
+$env:EXPIRY_CHECK_MS = '30000'
+try {
+    Invoke-Checked 'docker' @('compose', 'up', '-d', '--force-recreate', 'backend')
+} finally {
+    $env:OTP_RETURN_TO_CLIENT = $previousOtpFlag
+    $env:EXPIRE_AFTER = $previousExpiryAfter
+    $env:EXPIRY_CHECK_MS = $previousExpiryCheck
+}
+Write-Host 'PASS: local backend restored to 150-second order expiry for manual testing'
 
 Write-Host 'ALL TESTS PASSED.'

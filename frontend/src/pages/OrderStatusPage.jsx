@@ -77,17 +77,25 @@ const OrderStatusPage = () => {
           </div>
 
           {state === 'late' && <div className="mb-5 border-l-4 border-brand px-3 py-2"><strong>{t('notConfirmedYet')}</strong><p className="mt-1">{t('waitOrAsk')}</p></div>}
-          {state === 'paid' && <p className="mb-5">{t('paymentConfirmed')}</p>}
+          {state === 'paid' && <p className="mb-4">{t('paymentConfirmed')}</p>}
 
           <span className="field-label">{t('amount')}</span>
           <p className="amount-value mb-5">₹{order.amount}</p>
-          <span className="field-label">{t('token')}</span>
-          <p className="token-value">{order.token}</p>
+          {state === 'paid' ? (
+            <div className="mb-5 border-2 border-status-paid p-4 text-center" aria-label={t('customerToken')}>
+              <span className="field-label">{t('customerToken')}</span>
+              <p className="token-value mb-2" data-testid="customer-token">{order.token}</p>
+              <p className="text-small font-semibold">{t('tellVendorToken')}</p>
+            </div>
+          ) : (
+            <><span className="field-label">{t('token')}</span><p className="token-value">{order.token}</p></>
+          )}
 
           {state === 'paid' ? (
             <dl className="grid grid-cols-2 gap-4 border-t border-gray-300 pt-4">
               <div><dt className="field-label">{t('verifiedAt')}</dt><dd>{order.paidAt ? new Date(order.paidAt).toLocaleTimeString() : '—'}</dd></div>
-              <div><dt className="field-label">{t('reference')}</dt><dd className="break-all">{order.orderCode}</dd></div>
+              <div><dt className="field-label">{t('orderId')}</dt><dd className="break-all" data-testid="customer-order-id">{order.orderCode}</dd></div>
+              <p className="col-span-2 text-small text-text-secondary">{t('orderIdUse')}</p>
             </dl>
           ) : state === 'expired' ? (
             <p className="border-t border-gray-300 pt-4">{t('askNewToken')}</p>

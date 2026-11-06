@@ -1,5 +1,3 @@
-import React from 'react';
-
 const TokenDisplay = ({ token, size = 'lg' }) => {
   const sizes = {
     sm: 'text-h2',

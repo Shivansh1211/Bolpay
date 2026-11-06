@@ -33,6 +33,11 @@ public class MockGateway implements PaymentGateway {
     @Value("${public.base-url:http://localhost:5173}") private String publicBaseUrl;
     private final RestTemplate restTemplate = new RestTemplate();
 
+    private String resolvedGatewayUrl() {
+        return gatewayUrl.startsWith("http://") || gatewayUrl.startsWith("https://")
+                ? gatewayUrl : "https://" + gatewayUrl;
+    }
+
     private final Map<String, Boolean> simulatedPayments = new ConcurrentHashMap<>();
 
     @Override
@@ -45,7 +50,7 @@ public class MockGateway implements PaymentGateway {
             headers.set("x-api-version", "2025-01-01");
             Map<String, Object> body = Map.of("order_id", orderCode, "order_amount", amount,
                     "order_currency", "INR", "order_meta", Map.of("return_url", publicBaseUrl + "/o/" + orderCode));
-            ResponseEntity<Map> response = restTemplate.postForEntity(gatewayUrl + "/pg/orders",
+            ResponseEntity<Map> response = restTemplate.postForEntity(resolvedGatewayUrl() + "/pg/orders",
                     new HttpEntity<>(body, headers), Map.class);
             Map result = response.getBody();
             if (result == null || result.get("payment_session_id") == null)
@@ -99,7 +104,7 @@ public class MockGateway implements PaymentGateway {
             headers.set("x-client-id", clientId);
             headers.set("x-client-secret", clientSecret);
             headers.set("x-api-version", "2025-01-01");
-            Map response = restTemplate.exchange(gatewayUrl + "/pg/orders/" + orderCode,
+            Map response = restTemplate.exchange(resolvedGatewayUrl() + "/pg/orders/" + orderCode,
                     HttpMethod.GET, new HttpEntity<>(headers), Map.class).getBody();
             if (response == null) return PaymentStatus.UNKNOWN;
             return switch (String.valueOf(response.get("order_status"))) {

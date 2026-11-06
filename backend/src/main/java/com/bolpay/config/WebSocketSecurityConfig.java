@@ -60,7 +60,7 @@ public class WebSocketSecurityConfig implements ChannelInterceptor {
                 Collections.singletonList(new SimpleGrantedAuthority("ROLE_VENDOR"))
             ));
             
-            log.info("WebSocket connected for vendor: {} (vendorId: {})", phoneNumber, vendorId);
+            log.info("WebSocket connected for authenticated vendor; vendorId={}", vendorId);
         }
         
         if (StompCommand.SUBSCRIBE.equals(accessor.getCommand())) {

@@ -15,11 +15,11 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
-import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
+import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.security.SecureRandom;
@@ -38,6 +38,7 @@ public class OrderService {
     private final VendorRepository vendorRepository;
     private final PaymentGateway paymentGateway;
     private final SimpMessagingTemplate messagingTemplate;
+    private final FraudScoringService fraudScoringService;
 
     @Value("${order.slow-after:60}")
     private int slowAfterSeconds;
@@ -109,7 +110,9 @@ public class OrderService {
         order.setGatewayRef(paymentResult.gatewayRef());
         order = orderRepository.save(order);
 
-        log.info("Created order: code={}, amount={}, vendor={}", orderCode, request.getAmount(), vendor.getBusinessName());
+        notifyVendorAfterCommit(order);
+
+        log.info("Created order for vendor={}, amount={}", vendor.getBusinessName(), request.getAmount());
 
         return mapToDto(order);
     }
@@ -138,9 +141,9 @@ public class OrderService {
      * Get order by token and vendor (for quick check)
      */
     public OrderDto getOrderByTokenAndVendor(String token, Long vendorId) {
-        return orderRepository.findByVendorIdAndTokenAndStatus(vendorId, token, Order.OrderStatus.PENDING)
-                .map(this::mapToDto)
-                .orElse(null);
+        Order order = orderRepository.findByVendorIdAndTokenAndStatus(vendorId, token, Order.OrderStatus.PENDING)
+                .orElseGet(() -> orderRepository.findByVendorIdAndOrderCode(vendorId, token).orElse(null));
+        return order == null ? null : mapToDto(order);
     }
 
     /**
@@ -153,13 +156,13 @@ public class OrderService {
 
         // Check if already paid
         if (order.getStatus() == Order.OrderStatus.PAID || order.getStatus() == Order.OrderStatus.LATE_PAID) {
-            log.info("Order {} already paid, skipping", orderCode);
+            log.info("Already paid order callback skipped");
             return;
         }
 
         // Check if expired - mark as LATE_PAID instead of FLAGGED
         if (order.getStatus() == Order.OrderStatus.EXPIRED) {
-            log.warn("Order {} is expired, marking as LATE_PAID", orderCode);
+            log.warn("Expired order callback marked as late payment");
             order.setStatus(Order.OrderStatus.LATE_PAID);
             order.setPaidAt(LocalDateTime.now());
             orderRepository.save(order);
@@ -174,7 +177,7 @@ public class OrderService {
         order.setPaidAt(LocalDateTime.now());
         orderRepository.save(order);
 
-        log.info("Marked order {} as PAID", orderCode);
+        log.info("Order marked as PAID");
 
         // Send WebSocket notification to vendor
         notifyVendorAfterCommit(order);
@@ -194,7 +197,26 @@ public class OrderService {
             order.setStatus(Order.OrderStatus.EXPIRED);
             orderRepository.save(order);
             notifyVendorAfterCommit(order);
-            log.info("Marked order {} as EXPIRED", order.getOrderCode());
+            scheduleFraudScoringAfterCommit(order.getId());
+            log.info("Order marked as EXPIRED");
+        }
+    }
+
+    private void scheduleFraudScoringAfterCommit(Long orderId) {
+        Runnable schedule = () -> {
+            try {
+                fraudScoringService.scoreExpiredOrder(orderId);
+            } catch (RuntimeException rejected) {
+                // Keep expiry durable even if the bounded review executor is saturated.
+                log.warn("Could not queue risk review for expired order id {}", orderId);
+            }
+        };
+        if (TransactionSynchronizationManager.isSynchronizationActive()) {
+            TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                @Override public void afterCommit() { schedule.run(); }
+            });
+        } else {
+            schedule.run();
         }
     }
 
@@ -268,7 +290,7 @@ public class OrderService {
         if (input == null) return null;
         try {
             MessageDigest digest = MessageDigest.getInstance("SHA-256");
-            byte[] hash = digest.digest(input.getBytes());
+            byte[] hash = digest.digest(input.getBytes(StandardCharsets.UTF_8));
             StringBuilder hexString = new StringBuilder();
             for (byte b : hash) {
                 String hex = Integer.toHexString(0xff & b);

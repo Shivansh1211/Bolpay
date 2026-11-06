@@ -30,4 +30,7 @@ public class CreateOrderRequest {
 
     @Pattern(regexp = "^[6-9][0-9]{9}$", message = "Invalid phone number format")
     private String customerPhone; // Optional for tracking
+
+    @jakarta.validation.constraints.Size(max = 200)
+    private String deviceId; // Hashed by the backend before storage; never sent to ML.
 }

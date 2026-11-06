@@ -1,5 +1,13 @@
 # Attack test results
 
+## Latest full gate (2026-11-06)
+
+`pwsh -NoProfile -File tests/run-all.ps1` completed successfully: Maven 26 tests, 0 failures/errors/skips; Docker/API smoke checks passed; Playwright `2 passed (25.5s)`; final output included `ALL TESTS PASSED.` Raw transcript is ignored at `tests/artifacts/customer-token-fix-output.txt`. The Playwright flow now also checks the paid public status page's queue token, vendor quick lookup by Order ID, delayed five-second payment classification, and live scan/pending events. Twenty local webhook-received-to-board-DOM samples measured p95 **71 ms** in ignored `tests/artifacts/latency.json`; no production performance claim is implied.
+
+## Latest payment-flow run status (2026-11-05)
+
+The latest `pwsh -NoProfile -File tests/run-all.ps1` run is **not green**: Maven reported 26 tests with 0 failures/errors/skips and the API smoke checks passed, but Playwright reported `1 failed`, `1 passed (9.5s)` at the vendor quick-check assertion. Browser assertions before that point verified live scan count, live pending order, normal mock payment, green vendor row, customer Verified state, and visible Order ID. Three browser attempts reached the same strict-mode error because the quick-check result renders the Order ID twice; the stop gate was reached. The newly added five-second “Slow Pay” late-payment assertion occurs after that failure and is unverified. Raw full output is ignored at `tests/artifacts/payment-flow-fix-output.txt`. Historical p95 values below are from earlier successful runs and do not describe this failed run.
+
 Latest command: `pwsh -NoProfile -File tests/run-all.ps1`. Result: **ALL TESTS PASSED**; Maven reported 22 tests, 0 failures, 0 errors, 0 skipped, and Chromium Playwright passed. This is local automated evidence, not production security validation.
 
 ## WebSocket evidence

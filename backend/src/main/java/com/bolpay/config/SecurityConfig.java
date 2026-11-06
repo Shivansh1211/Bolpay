@@ -56,7 +56,7 @@ public class SecurityConfig {
                         // Webhook endpoint (public but will verify signature)
                         .requestMatchers("/api/webhook/**").permitAll()
                         // Health check
-                        .requestMatchers("/actuator/health").permitAll()
+                        .requestMatchers("/health", "/actuator/health").permitAll()
                         // All other requests require authentication
                         .anyRequest().authenticated()
                 )

@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { authAPI, vendorAPI } from '../services/api';
-import { useAuth } from '../contexts/AuthContext';
+import { useAuth } from '../contexts/useAuth';
 import { LanguageSelect, useTranslation } from '../i18n';
 
 const RegisterPage = () => {
@@ -34,12 +34,28 @@ const RegisterPage = () => {
         return;
       }
       const verified = await authAPI.verifyOtp(formData.phoneNumber, otpCode);
-      const response = await vendorAPI.register({ ...formData, slug: formData.slug || null }, verified.data.token, inviteCode.trim());
-      login({ token: verified.data.token, vendor: response.data });
-      navigate('/vendor/dashboard');
+      if (!verified.data.isNewUser && verified.data.vendor) {
+        login(verified.data);
+        navigate('/vendor/dashboard');
+        return;
+      }
+      try {
+        const response = await vendorAPI.register({ ...formData, slug: formData.slug || null }, verified.data.token, inviteCode.trim());
+        login({ token: verified.data.token, vendor: response.data });
+        navigate('/vendor/dashboard');
+      } catch (registrationError) {
+        const code = registrationError.response?.data?.code;
+        if (code === 'SLUG_TAKEN') setError('registerSlugTaken');
+        else if (code === 'PHONE_ALREADY_REGISTERED') setError('registerPhoneExists');
+        else if (registrationError.response?.status === 403) setError('inviteCodeError');
+        else setError('registerError');
+        // OTP verification consumes the code, so request a new one after any profile-save failure.
+        setOtpRequested(false);
+        setOtpCode('');
+        setReceivedOtp('');
+      }
     } catch (requestError) {
-      if (requestError.response?.status === 403) setError('inviteCodeError');
-      else if (requestError.response?.status === 429) setError('otpRateLimit');
+      if (requestError.response?.status === 429) setError('otpRateLimit');
       else if (requestError.response?.status === 400) setError('otpVerifyError');
       else setError('registerError');
     } finally {

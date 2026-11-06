@@ -6,6 +6,7 @@ import com.bolpay.service.AuthService;
 import com.bolpay.service.IncidentLogService;
 import com.bolpay.service.OrderService;
 import com.bolpay.service.ScanSessionService;
+import com.bolpay.service.FraudScoringService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
@@ -31,6 +32,7 @@ public class VendorBoardController {
     private final IncidentLogService incidentLogService;
     private final AuthService authService;
     private final ScanSessionService scanSessionService;
+    private final FraudScoringService fraudScoringService;
 
     /**
      * Get vendor board data
@@ -68,6 +70,7 @@ public class VendorBoardController {
         response.put("waitingOrders", pendingOrders);
         response.put("allOrders", allOrders);
         response.put("unresolvedIncidents", unresolvedIncidents);
+        response.put("fraudFlags", fraudScoringService.getFlagsForVendor(vendorId));
         
         return ResponseEntity.ok(response);
     }
@@ -91,13 +94,14 @@ public class VendorBoardController {
             ));
         }
         
-        return ResponseEntity.ok(Map.of(
-                "found", true,
-                "token", order.getToken(),
-                "status", order.getStatus(),
-                "amount", order.getAmount(),
-                "paidAt", order.getPaidAt()
-        ));
+        Map<String, Object> result = new HashMap<>();
+        result.put("found", true);
+        result.put("token", order.getToken());
+        result.put("orderCode", order.getOrderCode());
+        result.put("status", order.getStatus());
+        result.put("amount", order.getAmount());
+        result.put("paidAt", order.getPaidAt());
+        return ResponseEntity.ok(result);
     }
 
     /**

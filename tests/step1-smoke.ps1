@@ -33,14 +33,13 @@ function Wait-ForBackend {
 function New-SmokeVendorAndOrder {
     param([string]$BaseUrl)
     $suffix = [Guid]::NewGuid().ToString('N').Substring(0, 8)
-    $phonePrefix = (Get-Random -Minimum 6 -Maximum 10).ToString()
-    $phone = $phonePrefix + (Get-Random -Minimum 100000000 -Maximum 999999999).ToString()
+    $phone = '900000' + (Get-Random -Minimum 0 -Maximum 10000).ToString('D4')
     $otpResponse = Invoke-RestMethod -Method Post -Uri "$BaseUrl/api/auth/send-otp" -ContentType 'application/json' -Body (@{ phoneNumber = $phone } | ConvertTo-Json)
     if (-not $otpResponse.otp) { throw 'OTP was not returned; the test-only OTP_RETURN_TO_CLIENT flag is required for this smoke test.' }
     $auth = Invoke-RestMethod -Method Post -Uri "$BaseUrl/api/auth/verify-otp" -ContentType 'application/json' -Body (@{ phoneNumber = $phone; otpCode = $otpResponse.otp } | ConvertTo-Json)
     $vendorBody = @{
         phoneNumber = $phone
-        upiId = "smoke-$suffix@upi"
+        upiId = "demo.smoke.$suffix@examplebank"
         businessName = "Smoke Vendor $suffix"
         slug = "smoke-$suffix"
         description = 'Step 1 API smoke test'
@@ -95,10 +94,10 @@ try {
     Write-Host 'PASS: backend started with PAYMENT_GATEWAY=mock.'
 
     $migrationState = docker exec $dbName psql -U bolpay_smoke -d bolpay_smoke -Atc "select count(*) || ':' || bool_and(success) || ':' || max(version) from flyway_schema_history where success"
-    if ($LASTEXITCODE -ne 0 -or $migrationState.Trim() -ne '7:true:7') {
-        throw "Expected seven successful migrations on the empty database; got '$($migrationState.Trim())'."
+    if ($LASTEXITCODE -ne 0 -or $migrationState.Trim() -ne '8:true:8') {
+        throw "Expected eight successful migrations on the empty database; got '$($migrationState.Trim())'."
     }
-    Write-Host 'PASS: Flyway applied V1-V7 successfully to an empty database.'
+    Write-Host 'PASS: Flyway applied V1-V8 successfully to an empty database.'
 
     $flow = New-SmokeVendorAndOrder 'http://localhost:18080'
     Write-Host "PASS: API created vendor '$($flow.Vendor.slug)' and order with a valid token and payment_session_id (values withheld)."

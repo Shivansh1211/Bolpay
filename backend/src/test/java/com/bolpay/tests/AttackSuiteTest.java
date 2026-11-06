@@ -45,7 +45,8 @@ import static org.junit.jupiter.api.Assertions.*;
  */
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT, properties = {
         "order.expire-after=5", "order.expiry-check-ms=250",
-        "order.reconciliation-check-ms=3600000", "order.reconcile-min-age-seconds=0"
+        "order.reconciliation-check-ms=3600000", "order.reconcile-min-age-seconds=0",
+        "registration.invite-code="
 })
 @ActiveProfiles("test")
 public class AttackSuiteTest {
@@ -84,8 +85,8 @@ public class AttackSuiteTest {
         // Create test vendor
         String unique = UUID.randomUUID().toString().replace("-", "").substring(0, 10);
         testVendor = Vendor.builder()
-                .phoneNumber("9" + unique.substring(0, 9))
-                .upiId("test@upi")
+                .phoneNumber("900000" + String.format("%04d", Math.floorMod(UUID.randomUUID().hashCode(), 10_000)))
+                .upiId("demo.vendor@examplebank")
                 .businessName("Test Vendor")
                 .slug("test-vendor-" + unique)
                 .isActive(true)
@@ -103,7 +104,7 @@ public class AttackSuiteTest {
         CreateOrderRequest request = new CreateOrderRequest();
         request.setVendorSlug(testVendor.getSlug());
         request.setAmount(new BigDecimal("100"));
-        request.setCustomerPhone("9999999999");
+        request.setCustomerPhone("9000000000");
 
         OrderDto order = orderService.createOrder(request, "test-device");
 
@@ -342,15 +343,33 @@ public class AttackSuiteTest {
 
     @Test
     void registrationWithoutOtpProofIsRejected() {
-        Map<String, Object> body = Map.of("phoneNumber", "9876543211", "upiId", "demo@upi",
+        Map<String, Object> body = Map.of("phoneNumber", "9000000001", "upiId", "demo.unverified@examplebank",
                 "businessName", "Unverified Vendor", "slug", "unverified-vendor");
         ResponseEntity<Map> response = restTemplate.postForEntity("/api/vendor/register", body, Map.class);
         assertEquals(401, response.getStatusCode().value());
     }
 
     @Test
+    void duplicateRegistrationSlugReturnsActionableConflict() {
+        String phone = fakePhoneNumber();
+        String code = authService.sendOtp(phone);
+        var proof = authService.verifyOtp(phone, code);
+        Map<String, Object> body = Map.of("phoneNumber", phone, "upiId", "demo.new-vendor@examplebank",
+                "businessName", "Duplicate Link Test", "slug", testVendor.getSlug());
+        HttpHeaders headers = new HttpHeaders();
+        headers.setBearerAuth(proof.getToken());
+        headers.setContentType(MediaType.APPLICATION_JSON);
+
+        ResponseEntity<Map> response = restTemplate.postForEntity("/api/vendor/register",
+                new HttpEntity<>(body, headers), Map.class);
+
+        assertEquals(409, response.getStatusCode().value(), "Registration conflict response: " + response.getBody());
+        assertEquals("SLUG_TAKEN", response.getBody().get("code"));
+    }
+
+    @Test
     void otpIsNotReturnedToClientByDefault() throws Exception {
-        String phone = "9" + String.format("%09d", Math.floorMod(System.nanoTime(), 1_000_000_000L));
+        String phone = fakePhoneNumber();
         LoggerContext loggerContext = (LoggerContext) LoggerFactory.getILoggerFactory();
         ListAppender<ILoggingEvent> appender = new ListAppender<>();
         appender.setContext(loggerContext);
@@ -386,10 +405,19 @@ public class AttackSuiteTest {
         request.setVendorSlug(testVendor.getSlug());
         request.setAmount(new BigDecimal("100"));
         OrderDto order = orderService.createOrder(request, "test-device");
+        ResponseEntity<Map> publicStatus = restTemplate.getForEntity(
+                "/api/orders/" + order.getOrderCode() + "/status", Map.class);
+        assertTrue(publicStatus.getStatusCode().is2xxSuccessful());
+        assertTrue(publicStatus.getBody().get("token") instanceof String);
         HttpHeaders headers = new HttpHeaders();
+        headers.setBearerAuth(authService.generateToken(testVendor.getPhoneNumber(), testVendor.getId()));
+        ResponseEntity<Map> ownQuickCheck = restTemplate.exchange("/api/vendor/orders/check/" + order.getOrderCode(),
+                org.springframework.http.HttpMethod.GET, new HttpEntity<>(headers), Map.class);
+        assertEquals(Boolean.TRUE, ownQuickCheck.getBody().get("found"));
+        assertEquals(order.getOrderCode(), ownQuickCheck.getBody().get("orderCode"));
         String unique = UUID.randomUUID().toString().replace("-", "").substring(0, 9);
-        Vendor otherVendor = vendorRepository.save(Vendor.builder().phoneNumber("8" + unique)
-                .upiId("other@upi").businessName("Other Vendor").slug("other-" + unique).isActive(true).build());
+        Vendor otherVendor = vendorRepository.save(Vendor.builder().phoneNumber("8" + String.format("%09d", Math.floorMod(UUID.randomUUID().hashCode(), 1_000_000_000)))
+                .upiId("demo.other-vendor@examplebank").businessName("Other Vendor").slug("other-" + unique).isActive(true).build());
         headers.setBearerAuth(authService.generateToken(otherVendor.getPhoneNumber(), otherVendor.getId()));
         ResponseEntity<String> response = restTemplate.exchange("/api/orders/" + order.getOrderCode(),
                 org.springframework.http.HttpMethod.GET, new HttpEntity<>(headers), String.class);
@@ -503,5 +531,9 @@ public class AttackSuiteTest {
         Mac mac = Mac.getInstance("HmacSHA256");
         mac.init(new SecretKeySpec(secret.getBytes(StandardCharsets.UTF_8), "HmacSHA256"));
         return Base64.getEncoder().encodeToString(mac.doFinal(value.getBytes(StandardCharsets.UTF_8)));
+    }
+
+    private static String fakePhoneNumber() {
+        return "900000" + String.format("%04d", Math.floorMod(System.nanoTime(), 10_000));
     }
 }

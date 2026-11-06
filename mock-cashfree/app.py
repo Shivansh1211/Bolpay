@@ -17,6 +17,9 @@ CLIENT_SECRET = os.environ.get("CASHFREE_CLIENT_SECRET", "bolpay-mock-client-sec
 WEBHOOK_SECRET = os.environ.get("CASHFREE_WEBHOOK_SECRET", "bolpay-mock-webhook-secret")
 API_VERSION = "2025-01-01"
 ADMIN_PASSWORD = os.environ.get("MOCK_ADMIN_PASSWORD", "")
+BACKEND_URL = os.environ.get("BACKEND_URL", "http://backend:8080").rstrip("/")
+if not BACKEND_URL.startswith(("http://", "https://")):
+    BACKEND_URL = "https://" + BACKEND_URL
 
 def require_admin(view):
     @wraps(view)
@@ -32,6 +35,10 @@ def require_admin(view):
 # In-memory storage for orders
 orders = {}
 webhook_queue = []
+
+@app.route('/health', methods=['GET'])
+def health():
+    return jsonify({'status': 'healthy'}), 200
 
 # Mock checkout page HTML
 CHECKOUT_HTML = """
@@ -200,6 +207,24 @@ CHECKOUT_HTML = """
             margin-bottom: 16px;
             font-weight: 600;
         }
+        :root { color-scheme: light; --chai: #4A1D1F; --cream: #FFF8EC; --green: #17803F; }
+        body { background: var(--cream); color: #28201d; font-family: Arial, sans-serif; }
+        .container { max-width: 520px; margin: 24px auto; border: 1px solid #d6c7b5; border-radius: 8px; overflow: hidden; box-shadow: 0 8px 26px rgba(74,29,31,.10); }
+        .header { background: var(--chai); padding: 22px 24px; }
+        .header h1 { margin: 0 0 6px; font-size: 24px; }
+        .header p { margin: 0 0 10px; opacity: .9; }
+        .badge { background: #fff8ec; color: var(--chai); border-radius: 3px; font-weight: 700; }
+        .content { padding: 22px; }
+        .payee-info { background: #fff; border: 1px solid #e2d5c7; border-radius: 4px; }
+        .amount-display { color: var(--chai); }
+        .upi-app { border-radius: 4px; color: #28201d; min-height: 96px; }
+        .upi-app:hover { border-color: var(--chai); transform: none; box-shadow: 0 0 0 2px rgba(74,29,31,.12); }
+        .demo-controls { background: #f1e8dc; border-radius: 4px; }
+        .btn, .selected-app-display { background: var(--chai); border-radius: 4px; }
+        .btn:hover { filter: brightness(1.12); transform: none; box-shadow: none; }
+        .btn-fail { background: #7a4500; }
+        .btn-abandon { background: #515b66; }
+        @media (max-width: 560px) { .container { margin: 0 auto; min-height: 100vh; border-radius: 0; } .content { padding: 18px; } }
     </style>
 </head>
 <body>
@@ -207,14 +232,14 @@ CHECKOUT_HTML = """
         <div id="checkout-screen" class="checkout-screen">
             <div class="header">
                 <h1>💳 BolPay Checkout</h1>
-                <p>Secure Payment Gateway</p>
+                <p>Local demo · no real payment is made</p>
                 <span class="badge">Simulated Money</span>
             </div>
             
             <div class="content">
                 <div class="payee-info">
                     <p><span class="label">Payee</span><br><span class="value">Test Merchant</span></p>
-                    <p><span class="label">Order Reference</span><br><span class="value">{{ order_id }}</span></p>
+                    <p><span class="label">Order ID</span><br><span class="value">{{ order_id }}</span></p>
                     <p><span class="label">Amount</span><br><span class="amount-display" style="font-size: 32px; margin: 8px 0;">₹{{ amount }}</span></p>
                 </div>
                 
@@ -325,7 +350,7 @@ CHECKOUT_HTML = """
             const payload = {
                 order_id: '{{ order_id }}',
                 cf_order_id: '{{ cf_order_id }}',
-                order_status: scenarioType === 'success' || scenarioType === 'drop' ? 'PAID' : 'FAILED',
+                order_status: scenarioType === 'success' || scenarioType === 'drop' || scenarioType === 'slow' ? 'PAID' : 'FAILED',
                 order_amount: scenarioType === 'wrong_amount' ? {{ amount * 2 }} : {{ amount }},
                 payment_time: new Date().toISOString(),
                 scenario: scenarioType
@@ -405,6 +430,8 @@ def create_order():
 @app.route('/pg/orders/<order_id>', methods=['GET'])
 def get_order(order_id):
     """Get order status endpoint"""
+    if request.headers.get('x-client-id') != CLIENT_ID or request.headers.get('x-client-secret') != CLIENT_SECRET:
+        return jsonify({'error': 'Authentication required'}), 401
     if order_id not in orders:
         return jsonify({'error': 'Order not found'}), 404
     
@@ -469,7 +496,7 @@ def send_webhook():
         signature = generate_signature(timestamp, payload_str)
     
     # Send webhook to backend
-    webhook_url = 'http://backend:8080/api/webhook/payment'
+    webhook_url = BACKEND_URL + '/api/webhook/payment'
     headers = {
         'Content-Type': 'application/json',
         'X-Webhook-Signature': signature,
@@ -603,7 +630,7 @@ def execute_attack(attack_type):
         return jsonify({'error': 'Order not found'}), 404
     
     order = orders[order_id]
-    webhook_url = 'http://backend:8080/api/webhook/payment'
+    webhook_url = BACKEND_URL + '/api/webhook/payment'
     
     if attack_type == 'forged':
         # Send with bad signature
@@ -667,4 +694,4 @@ def send_to_backend(url, payload, signature, timestamp=None, headers=None):
         return jsonify({'status': 'error', 'error': str(e)})
 
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=9000, debug=False)
+    app.run(host='0.0.0.0', port=int(os.environ.get('PORT', '9000')), debug=False)

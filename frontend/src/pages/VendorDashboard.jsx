@@ -1,11 +1,26 @@
 import { useEffect, useState } from 'react';
-import { useAuth } from '../contexts/AuthContext';
+import { useAuth } from '../contexts/useAuth';
 import { useNavigate } from 'react-router-dom';
 import { connectWebSocket, disconnectWebSocket } from '../services/websocket';
-import { orderAPI } from '../services/api';
 import Button from '../components/Button';
 import Card from '../components/Card';
 import { LanguageSelect, useTranslation } from '../i18n';
+
+const speakVendorAnnouncement = (message, language) => {
+  if (!('speechSynthesis' in window) || !window.speechSynthesis) return;
+  const locale = language === 'hi' ? 'hi-IN' : 'en-IN';
+  const utterance = new SpeechSynthesisUtterance(message);
+  utterance.lang = locale;
+  utterance.rate = 0.94;
+  utterance.pitch = 1.04;
+  utterance.volume = 1;
+
+  const voices = window.speechSynthesis.getVoices();
+  const matchingVoice = voices.find((voice) => voice.lang.toLowerCase() === locale.toLowerCase())
+    || voices.find((voice) => voice.lang.toLowerCase().startsWith(language === 'hi' ? 'hi' : 'en-in'));
+  if (matchingVoice) utterance.voice = matchingVoice;
+  window.speechSynthesis.speak(utterance);
+};
 
 // OrderRow component for color-coded order rows
 const OrderRow = ({ order, type, t }) => {
@@ -61,6 +76,7 @@ const VendorDashboard = () => {
   const [voiceEnabled, setVoiceEnabled] = useState(() => localStorage.getItem('voiceAnnouncements') === 'true');
   const [glanceMode, setGlanceMode] = useState(false);
   const [scanCount, setScanCount] = useState(0);
+  const [recentScan, setRecentScan] = useState(false);
 
   useEffect(() => {
     // Fetch board data
@@ -86,6 +102,16 @@ const VendorDashboard = () => {
     // Connect to WebSocket for real-time updates (quiet by default)
     if (user?.id) {
       connectWebSocket((orderData) => {
+        if (orderData.eventType === 'FRAUD_FLAG') {
+          fetchBoardData();
+          return;
+        }
+        if (orderData.eventType === 'SCAN') {
+          fetchBoardData();
+          setRecentScan(true);
+          window.setTimeout(() => setRecentScan(false), 8000);
+          return;
+        }
         const isException = orderData.status === 'LATE_PAID' || orderData.status === 'FLAGGED';
         if (isException) {
           setRecentPayment(orderData);
@@ -95,21 +121,21 @@ const VendorDashboard = () => {
           }
         }
 
-        if (voiceEnabled && 'speechSynthesis' in window && window.speechSynthesis) {
-          const message = isException
+        if (voiceEnabled) {
+          const message = orderData.status === 'LATE_PAID'
             ? (language === 'hi'
-              ? `असामान्य भुगतान: ${orderData.amount} रुपये`
-              : `Unusual payment: ${orderData.amount} rupees`)
-            : (orderData.status === 'PAID'
+              ? `यह भुगतान टोकन की अवधि खत्म होने के बाद आया है। कृपया सामान देने से पहले ऑर्डर जाँच लें।`
+              : `This payment arrived after the token expired. Please check the order before handing over the item.`)
+            : orderData.status === 'FLAGGED'
               ? (language === 'hi'
-                ? `${orderData.amount} रुपये का भुगतान मिल गया। टोकन ${orderData.token}`
-                : `Payment received: ${orderData.amount} rupees. Token ${orderData.token}`)
-              : null);
-          if (message) {
-            const utterance = new SpeechSynthesisUtterance(message);
-            utterance.lang = language === 'hi' ? 'hi-IN' : 'en-IN';
-            window.speechSynthesis.speak(utterance);
-          }
+                ? `इस भुगतान की पुष्टि अभी नहीं हुई है। कृपया सामान देने से पहले ऑर्डर जाँच लें।`
+                : `This payment is not confirmed yet. Please check the order before handing over the item.`)
+              : orderData.status === 'PAID'
+                ? (language === 'hi'
+                  ? `अच्छी खबर। ${orderData.amount} रुपये मिल गए हैं। टोकन ${orderData.token} है।`
+                  : `Good news. ₹${orderData.amount} has been received. The token is ${orderData.token}.`)
+                : null;
+          if (message) speakVendorAnnouncement(message, language);
         }
         
         // Refresh board data
@@ -131,11 +157,12 @@ const VendorDashboard = () => {
     const nextEnabled = !voiceEnabled;
     setVoiceEnabled(nextEnabled);
     localStorage.setItem('voiceAnnouncements', String(nextEnabled));
-    if (nextEnabled && 'speechSynthesis' in window && window.speechSynthesis) {
+    if (nextEnabled) {
       window.speechSynthesis.cancel();
-      const prompt = new SpeechSynthesisUtterance(language === 'hi' ? 'आवाज़ चालू है' : 'Voice announcements enabled');
-      prompt.lang = language === 'hi' ? 'hi-IN' : 'en-IN';
-      window.speechSynthesis.speak(prompt);
+      speakVendorAnnouncement(
+        language === 'hi' ? 'भुगतान की पुष्टि होते ही मैं आपको बता दूँगा।' : `I'll let you know when a payment is confirmed.`,
+        language,
+      );
     }
   };
 
@@ -206,11 +233,26 @@ const VendorDashboard = () => {
 
       <main className="page-width py-6">
         <div className="board-counters" aria-label={t('orders')}>
+          {recentScan && <p className="col-span-full text-status-paying font-semibold" role="status" aria-live="polite">{t('customerJustScanned')}</p>}
           <div className="board-counter"><span className="board-counter-label"><span aria-hidden="true">◉</span>{t('scanned')}</span><span data-testid="scan-count" className="board-counter-value">{scanCount}</span><span className="text-tiny text-text-secondary">{t('customersToday')}</span></div>
           <div className="board-counter"><span className="board-counter-label"><span aria-hidden="true">◷</span>{t('payingNow')}</span><span className="board-counter-value">{boardData?.waitingOrders?.length || 0}</span><span className="text-tiny text-text-secondary">{t('activePayments')}</span></div>
           <div className="board-counter"><span className="board-counter-label"><span aria-hidden="true">✓</span>{t('paidTenMinutes')}</span><span className="board-counter-value">{boardData?.paidOrders?.length || 0}</span><span className="text-tiny text-text-secondary">{t('completedPayments')}</span></div>
           <div className="board-counter"><span className="board-counter-label"><span aria-hidden="true">△</span>{t('latePayment')}</span><span className="board-counter-value">{lateCount}</span><span className="text-tiny text-text-secondary">{t('orders')}</span></div>
         </div>
+
+        {(boardData?.fraudFlags || []).length > 0 && (
+          <section className="mb-6 border-2 border-status-paying bg-white p-4" aria-labelledby="review-flags-heading">
+            <h2 id="review-flags-heading" className="section-heading">{t('reviewFlags')}</h2>
+            <ul className="space-y-3" aria-live="polite">
+              {boardData.fraudFlags.map((flag) => (
+                <li key={`${flag.orderCode}-${flag.createdAt}`} className="border-l-4 border-status-paying bg-amber-50 p-3">
+                  <p className="font-semibold">{t('orderToReview')}: {flag.token} · {t('orderId')} {flag.orderCode} · ₹{flag.amount}</p>
+                  {(flag.reasons || []).map((reason, index) => <p key={index}>{reason}</p>)}
+                </li>
+              ))}
+            </ul>
+          </section>
+        )}
 
         {/* Quick Actions */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
@@ -224,7 +266,7 @@ const VendorDashboard = () => {
                 onChange={(e) => setQuickCheckToken(e.target.value.toUpperCase())}
                 placeholder={t('enterToken')}
                 className="field-input flex-1 uppercase font-bold"
-                maxLength={4}
+                maxLength={12}
               />
               <Button
                 type="submit"
@@ -236,10 +278,11 @@ const VendorDashboard = () => {
             </form>
 
             {quickCheckResult && (
-              <div className={`mt-4 border-l-4 p-4 ${quickCheckResult.found ? `order-row--${quickCheckResult.status === 'PAID' ? 'paid' : quickCheckResult.status === 'EXPIRED' ? 'expired' : quickCheckResult.status === 'LATE_PAID' ? 'late' : 'waiting'}` : 'border-status-expired'}`} role="status" aria-live="polite">
+              <div data-testid="quick-check-result" className={`mt-4 border-l-4 p-4 ${quickCheckResult.found ? `order-row--${quickCheckResult.status === 'PAID' ? 'paid' : quickCheckResult.status === 'EXPIRED' ? 'expired' : quickCheckResult.status === 'LATE_PAID' ? 'late' : 'waiting'}` : 'border-status-expired'}`} role="status" aria-live="polite">
                 {quickCheckResult.found ? (
                   <div className="text-center">
                     <p className="token-value">{quickCheckResult.token}</p>
+                    <p className="text-small">{t('orderId')}: {quickCheckResult.orderCode}</p>
                     <p className="section-heading">{quickCheckLabel}: ₹{quickCheckResult.amount}</p>
                   </div>
                 ) : (

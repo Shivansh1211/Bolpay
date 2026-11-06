@@ -1,0 +1,2 @@
+# Reviewed historical false positive: docs/API.md contained an intentionally invalid illustrative token, not a credential. Current example is FAKE_NOT_A_JWT.
+84149e1bee20cc451f4c3e2f1444e876641cea13:docs/API.md:generic-api-key:110

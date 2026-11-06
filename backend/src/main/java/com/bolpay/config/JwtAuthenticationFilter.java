@@ -48,7 +48,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                 authentication.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
                 SecurityContextHolder.getContext().setAuthentication(authentication);
 
-                log.debug("Authenticated user: {} with vendorId: {}", phoneNumber, vendorId);
+                log.debug("Authenticated vendor session established; vendorId={}", vendorId);
             }
         }
 

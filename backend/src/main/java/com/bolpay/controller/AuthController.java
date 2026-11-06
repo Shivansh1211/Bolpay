@@ -28,15 +28,25 @@ public class AuthController {
     @Value("${otp.return-to-client:false}")
     private boolean returnOtpToClient;
 
+    @Value("${otp.demo-enabled:false}")
+    private boolean demoOtpEnabled;
+
+    @Value("${registration.invite-code:}")
+    private String registrationInviteCode;
+
     /**
      * Send OTP to phone number
      * POST /api/auth/send-otp
      */
     @PostMapping("/send-otp")
     public ResponseEntity<Map<String, String>> sendOtp(@Valid @RequestBody SendOtpRequest request) {
+        boolean exposeForDemo = returnOtpToClient || demoOtpEnabled;
+        if (demoOtpEnabled && (registrationInviteCode == null || registrationInviteCode.isBlank())) {
+            throw new IllegalStateException("DEMO_OTP requires INVITE_CODE to be configured");
+        }
         String otp = authService.sendOtp(request.getPhoneNumber());
-        Map<String, String> response = returnOtpToClient
-                ? Map.of("message", "OTP sent successfully", "otp", otp)
+        Map<String, String> response = exposeForDemo
+                ? Map.of("message", "OTP sent successfully", "otp", otp, "mode", "demo login")
                 : Map.of("message", "OTP sent successfully");
         return ResponseEntity.ok(response);
     }

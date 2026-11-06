@@ -4,7 +4,6 @@ import com.bolpay.dto.CreateOrderRequest;
 import com.bolpay.dto.OrderDto;
 import com.bolpay.service.OrderService;
 import com.bolpay.service.AuthService;
-import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -33,12 +32,8 @@ public class OrderController {
      */
     @PostMapping("/create")
     public ResponseEntity<OrderDto> createOrder(
-            @Valid @RequestBody CreateOrderRequest request,
-            HttpServletRequest httpRequest) {
-        
-        // Extract device fingerprint from request (simplified - in production, use proper fingerprinting)
-        String deviceFingerprint = httpRequest.getHeader("User-Agent") + httpRequest.getRemoteAddr();
-        
+            @Valid @RequestBody CreateOrderRequest request) {
+        String deviceFingerprint = request.getDeviceId();
         OrderDto order = orderService.createOrder(request, deviceFingerprint);
         return ResponseEntity.ok(order);
     }
@@ -85,6 +80,7 @@ public class OrderController {
 
         Map<String, Object> response = new HashMap<>();
         response.put("orderCode", order.getOrderCode());
+        response.put("token", order.getToken());
         response.put("status", order.getStatus());
         response.put("amount", order.getAmount());
         response.put("paidAt", order.getPaidAt());

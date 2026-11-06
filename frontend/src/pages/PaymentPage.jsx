@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { orderAPI } from '../services/api';
 
@@ -9,7 +9,6 @@ const PaymentPage = () => {
   const [customerPhone, setCustomerPhone] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  const [order, setOrder] = useState(null);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -22,8 +21,6 @@ const PaymentPage = () => {
         amount: parseFloat(amount),
         customerPhone: customerPhone || undefined,
       });
-
-      setOrder(response.data);
 
       // Navigate to status page (in production, would open UPI intent first)
       navigate(`/order/${response.data.orderCode}`);

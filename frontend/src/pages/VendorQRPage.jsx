@@ -1,11 +1,12 @@
 import { useEffect, useState } from 'react';
-import { useAuth } from '../contexts/AuthContext';
+import { useAuth } from '../contexts/useAuth';
 import { useNavigate } from 'react-router-dom';
 import QRCode from 'qrcode.react';
 import { LanguageSelect, useTranslation } from '../i18n';
+import { vendorAPI } from '../services/api';
 
 const VendorQRPage = () => {
-  const { user } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const navigate = useNavigate();
   const { language, setLanguage, t } = useTranslation();
   const [vendor, setVendor] = useState(null);
@@ -13,6 +14,7 @@ const VendorQRPage = () => {
   const [loadFailed, setLoadFailed] = useState(false);
 
   useEffect(() => {
+    if (authLoading) return;
     if (!user) {
       navigate('/login');
       return;
@@ -21,17 +23,14 @@ const VendorQRPage = () => {
     setPublicBaseUrl(import.meta.env.VITE_PUBLIC_BASE_URL || window.location.origin);
     const fetchVendor = async () => {
       try {
-        const response = await fetch(`/api/vendors/${user.id}`, {
-          headers: { Authorization: `Bearer ${localStorage.getItem('token')}` },
-        });
-        if (!response.ok) throw new Error('Could not load vendor.');
-        setVendor(await response.json());
+        const response = await vendorAPI.getProfile();
+        setVendor(response.data);
       } catch {
         setLoadFailed(true);
       }
     };
     fetchVendor();
-  }, [user, navigate]);
+  }, [user, authLoading, navigate]);
 
   if (!vendor) {
     return (

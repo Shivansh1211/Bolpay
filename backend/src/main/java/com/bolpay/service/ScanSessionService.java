@@ -6,6 +6,9 @@ import com.bolpay.repository.ScanSessionRepository;
 import com.bolpay.repository.VendorRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.messaging.simp.SimpMessagingTemplate;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.nio.charset.StandardCharsets;
@@ -17,6 +20,7 @@ import java.time.LocalDateTime;
 public class ScanSessionService {
     private final ScanSessionRepository scanSessionRepository;
     private final VendorRepository vendorRepository;
+    private final SimpMessagingTemplate messagingTemplate;
 
     @Transactional
     public void recordScan(String slug, String deviceId) {
@@ -29,6 +33,15 @@ public class ScanSessionService {
                 .vendor(vendor)
                 .deviceHash(sha256(deviceId))
                 .build());
+        Runnable publish = () -> messagingTemplate.convertAndSend("/topic/vendor/" + vendor.getId(),
+                java.util.Map.of("eventType", "SCAN"));
+        if (TransactionSynchronizationManager.isSynchronizationActive()) {
+            TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                @Override public void afterCommit() { publish.run(); }
+            });
+        } else {
+            publish.run();
+        }
     }
 
     @Transactional(readOnly = true)

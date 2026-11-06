@@ -4,16 +4,16 @@
 
 - Command: `pwsh -NoProfile -File tests/run-all.ps1`
 - Result: exit code 0.
-- Maven: latest gate, 25 tests, 0 failures, 0 errors, 0 skipped.
+- Maven: latest gate, 31 tests, 0 failures, 0 errors, 0 skipped.
 - Docker/API smoke: passed, including migrations on an empty temporary database, persisted scan session, mock checkout, and mock-admin route denial at the frontend edge.
-- Playwright: final gate, 2 passed in 29.6 seconds. The live app flow covered scan, Scanned counter, amount entry, token and amber row, mock payment, live green board row without refresh, customer Verified state, abandon, and red expired row.
-- Final runner output excerpt: see [docs/test-run-output.txt](docs/test-run-output.txt). Full raw transcript: ignored `tests/artifacts/close-gaps-final-run-1.txt`.
+- Playwright: latest gate, 2 passed in 22.9 seconds. The live app flow covered scan, Scanned counter, amount entry, token and amber row, mock payment, live green board row without refresh, customer Verified state, abandon, and red expired row.
+- Final runner output from the latest run: `2 passed (22.9s)`; `PASS: Playwright customer flow, vendor live board, voice announcement, screenshots, and webhook latency samples`; `PASS: local backend restored to 150-second order expiry for manual testing`; `ALL TESTS PASSED.` The prior full PowerShell transcript is ignored at `tests/artifacts/pre-push-final-run.txt`; the latest direct console output was observed during this run.
 
 ## Browser-driven authentication
 
-The full Playwright gate also registers a vendor through the browser UI, verifies the OTP, submits a profile with a UPI ID, logs out, logs in with a newly issued OTP, checks wrong-code and lockout messages, and switches the visible auth screen to Hindi. OTP values and phone fields are hidden in the saved screenshots. In addition, `AttackSuiteTest.otpIsNotReturnedToClientByDefault` checks the default API response and captured application logs. The full-runner local E2E explicitly enables the dev-only OTP response for the automated browser test. The latest full gate reported 25 Maven tests and 2 Playwright tests passing; the full raw output is ignored at `tests/artifacts/close-gaps-final-run-1.txt`.
+The full Playwright gate also registers a vendor through the browser UI, verifies the OTP, submits a profile with a UPI ID, logs out, logs in with a newly issued OTP, checks wrong-code and lockout messages, and switches the visible auth screen to Hindi. Saved auth screenshots use fictional test values; OTP fields and the local demo code are hidden. In addition, `AttackSuiteTest.otpIsNotReturnedToClientByDefault` checks the default API response and captured application logs. The full-runner local E2E explicitly enables the dev-only OTP response for the automated browser test. The latest full gate reported 31 Maven tests and 2 Playwright tests passing; the full raw output is ignored at `tests/artifacts/close-gaps-final-run-1.txt`.
 
-- [Registration form (redacted)](docs/test-evidence/auth-01-registration-details-redacted.png)
+- [Registration form with fictional test data](docs/test-evidence/auth-01-registration-details-fake-data.png)
 - [Wrong OTP message](docs/test-evidence/auth-02-wrong-code.png)
 - [OTP attempt limit](docs/test-evidence/auth-03-rate-limited.png)
 - [Hindi auth screen](docs/test-evidence/auth-04-hindi-rate-limit.png)
@@ -24,7 +24,7 @@ The full Playwright gate also registers a vendor through the browser UI, verifie
 
 ## Webhook-to-board latency
 
-The latest local run recorded 20 samples from the backend webhook-controller received timestamp until the paid state appeared in the vendor board DOM. The measured p95 was **99 ms**. Samples and method label are in ignored `tests/artifacts/latency.json`. This is a local mock-stack measurement, not a production performance result.
+The latest local run recorded 20 samples from the backend webhook-controller received timestamp until the paid state appeared in the vendor board DOM. The measured p95 was **70 ms**. Samples and method label are in ignored `tests/artifacts/latency.json`. This is a local mock-stack measurement, not a production performance result.
 
 ## Auth redesign review
 

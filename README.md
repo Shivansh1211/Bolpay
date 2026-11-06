@@ -2,6 +2,8 @@
 
 A payment verification dashboard prototype for small Indian vendors (paratha stalls, tea carts, autos) to help review payment status against server-side gateway events.
 
+**Repository data note:** All vendor names, phone numbers, and UPI IDs in this repository are fictional test data. The payment workflow and gateway are mocked; do not use these fixtures as real customer or merchant records.
+
 ## Core Problem
 
 BolPay displays payment state for an order created before checkout. The local mock gateway and automated tests exercise this flow; a production gateway, operational controls, and real-world validation are not established by this repository. The UI is not a guarantee against fraud.

@@ -8,7 +8,12 @@ let subscriptions = [];
 
 export const connectWebSocket = (onMessageCallback, vendorId, token) => {
   const configuredUrl = import.meta.env.VITE_WS_URL;
-  const socketUrl = configuredUrl || `${window.location.protocol}//${window.location.host}/ws`;
+  // SockJS takes an HTTP(S) base URL and negotiates WebSocket (WSS on TLS).
+  // Accept the deployment-facing wss:// value while preserving SockJS fallback transports.
+  const sockJsUrl = configuredUrl?.startsWith('wss://')
+    ? configuredUrl.replace(/^wss:/, 'https:')
+    : configuredUrl;
+  const socketUrl = sockJsUrl || `${window.location.protocol}//${window.location.host}/ws`;
   const socket = new SockJS(socketUrl);
   stompClient = Stomp.over(socket);
   stompClient.reconnect_delay = 3000;
