@@ -4,6 +4,7 @@
 - Added scoped Render webhook/ML secret environment groups, an environment-only fictional demo seed script, and Neon backup/restore plus recovery documentation.
 - Removed obsolete managed-database expiry claims and recorded that hosted Neon remains unprovisioned and untested.
 - Added a secret-safe startup URL guard and tests, pinned pgJDBC 42.7.14, and verified the local full Docker/Maven/smoke/Playwright gate.
+- Adjusted the demo seed to support local Compose Postgres without weakening required TLS/channel binding on remote database connections.
 
 - Replaced the misleading registration evidence with a new screenshot generated using clearly fictional test phone/UPI data, and aligned browser, API, smoke, and attack fixtures with that test-data convention.
 - Added a repository note that vendor names, phone numbers, and UPI IDs are fictional, and removed phone numbers and order codes from backend informational logs.

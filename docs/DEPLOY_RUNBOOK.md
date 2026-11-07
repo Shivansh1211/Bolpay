@@ -65,9 +65,9 @@ Create the Vercel project from the private repository with root directory `front
 
 ## Demo seed
 
-The idempotent seed uses only fictional data and reads only `SPRING_DATASOURCE_URL`, `SPRING_DATASOURCE_USERNAME`, and `SPRING_DATASOURCE_PASSWORD` from the current PowerShell environment. It requires PostgreSQL client tools (`psql`) and a direct Neon URL. It rejects pooled hosts and URLs missing `sslmode=require` or `channelBinding=require`.
+The idempotent seed uses only fictional data and reads only `SPRING_DATASOURCE_URL`, `SPRING_DATASOURCE_USERNAME`, and `SPRING_DATASOURCE_PASSWORD` from the current PowerShell environment. It requires PostgreSQL client tools (`psql`). Local hosts (`localhost`, `127.0.0.1`, `::1`, and Compose's `postgres`) may use the local Compose URL without TLS query options. Remote hosts must use a direct Neon URL (no `-pooler`) with `sslmode=require` and `channelBinding=require`; username and password must remain outside the URL.
 
-For local Docker, set those three variables in the shell to the local Compose database connection (host `localhost`, mapped Postgres port, local username/password); do not change Compose. For hosted Neon, set them in a private shell session from Render/Neon’s connection details without echoing values, then run:
+For local Docker, set those three variables in the shell to `jdbc:postgresql://localhost:5432/bolpay` (or the local mapped port), plus the local username/password; do not change Compose. For hosted Neon, set them in a private shell session from Render/Neon’s connection details without echoing values, then run:
 
 ```powershell
 pwsh -NoProfile -File scripts/seed-demo.ps1

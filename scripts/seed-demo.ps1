@@ -13,20 +13,29 @@ $jdbc = $env:SPRING_DATASOURCE_URL
 if (-not $jdbc.StartsWith('jdbc:postgresql://', [StringComparison]::Ordinal)) {
     throw 'SPRING_DATASOURCE_URL must start with jdbc:postgresql://.'
 }
-$parsed = [Uri]($jdbc.Substring(5))
-if ($parsed.Host -match '-pooler(?:\.|$)') {
-    throw 'Use the Neon direct endpoint (hostname without -pooler) for seeding and migrations.'
+try { $parsed = [Uri]($jdbc.Substring(5)) }
+catch { throw 'SPRING_DATASOURCE_URL is not a valid PostgreSQL JDBC URL.' }
+if (-not [string]::IsNullOrEmpty($parsed.UserInfo)) {
+    throw 'Keep database username and password in their separate environment variables.'
 }
 $query = @{}
 foreach ($pair in $parsed.Query.TrimStart('?').Split('&', [StringSplitOptions]::RemoveEmptyEntries)) {
     $parts = $pair.Split('=', 2)
     $query[[Uri]::UnescapeDataString($parts[0])] = if ($parts.Length -gt 1) { [Uri]::UnescapeDataString($parts[1]) } else { '' }
 }
-if ($query['sslmode'] -ne 'require' -or $query['channelBinding'] -ne 'require') {
-    throw 'The JDBC URL must require sslmode=require and channelBinding=require.'
+if ($query.ContainsKey('user') -or $query.ContainsKey('password')) {
+    throw 'Keep database username and password in their separate environment variables.'
 }
 $database = [Uri]::UnescapeDataString($parsed.AbsolutePath.TrimStart('/'))
 if ([string]::IsNullOrWhiteSpace($database)) { throw 'SPRING_DATASOURCE_URL must include a database name.' }
+
+$isLocalHost = $parsed.Host -in @('localhost', '127.0.0.1', '::1', 'postgres')
+if ($parsed.Host -match '-pooler(?:\.|$)') {
+    throw 'Use the Neon direct endpoint (hostname without -pooler) for seeding and migrations.'
+}
+if (-not $isLocalHost -and ($query['sslmode'] -ne 'require' -or $query['channelBinding'] -ne 'require')) {
+    throw 'Remote database URLs must require sslmode=require and channelBinding=require.'
+}
 
 $pgNames = @('PGHOST', 'PGPORT', 'PGDATABASE', 'PGUSER', 'PGPASSWORD', 'PGSSLMODE', 'PGCHANNELBINDING', 'PGCONNECT_TIMEOUT')
 $previousPg = @{}
@@ -37,8 +46,8 @@ $env:PGPORT = if ($parsed.IsDefaultPort) { '5432' } else { [string]$parsed.Port 
 $env:PGDATABASE = $database
 $env:PGUSER = $env:SPRING_DATASOURCE_USERNAME
 $env:PGPASSWORD = $env:SPRING_DATASOURCE_PASSWORD
-$env:PGSSLMODE = 'require'
-$env:PGCHANNELBINDING = 'require'
+$env:PGSSLMODE = if ($isLocalHost) { 'prefer' } else { 'require' }
+$env:PGCHANNELBINDING = if ($isLocalHost) { 'prefer' } else { 'require' }
 $env:PGCONNECT_TIMEOUT = '20'
 
 try {
