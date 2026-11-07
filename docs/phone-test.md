@@ -14,4 +14,4 @@ Perform this only after the owner has deployed and run the remote smoke test. Us
 - [ ] Repeat after the Render services have slept for at least 15 minutes. Record cold-start time, failures, reconnect behavior, and whether any action needs to be retried. Do not press pay twice if the first request is still pending.
 - [ ] Record device model, OS/browser version, network type, date/time, screenshots with customer references redacted, and each result. Do not record OTPs, invite codes, tokens, or payment credentials.
 
-Report failures before sharing the QR with customers. A phone test does not replace a real gateway/sandbox integration, field vendor survey, or a review of the 30-day free database lifecycle.
+Report failures before sharing the QR with customers. A phone test does not replace a real gateway/sandbox integration or a field vendor survey.

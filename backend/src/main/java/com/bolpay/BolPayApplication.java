@@ -16,6 +16,7 @@ import org.springframework.scheduling.annotation.EnableAsync;
 public class BolPayApplication {
 
     public static void main(String[] args) {
+        DatabaseUrlValidator.validate(System.getenv("SPRING_DATASOURCE_URL"));
         SpringApplication.run(BolPayApplication.class, args);
     }
 }

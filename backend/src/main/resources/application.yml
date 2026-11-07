@@ -5,8 +5,15 @@ spring:
     name: bolpay-backend
   datasource:
     url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://postgres:5432/bolpay}
-    username: ${POSTGRES_USER:bolpay_user}
+    username: ${SPRING_DATASOURCE_USERNAME:${POSTGRES_USER:bolpay_user}}
     password: ${SPRING_DATASOURCE_PASSWORD:bolpay_mock_dev_password}
+    hikari:
+      maximum-pool-size: 4
+      minimum-idle: 0
+      connection-timeout: 20000
+      validation-timeout: 5000
+      initialization-fail-timeout: 120000
+      max-lifetime: 1500000
   jpa:
     hibernate:
       ddl-auto: validate

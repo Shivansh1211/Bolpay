@@ -1,111 +1,99 @@
-services:
-  - type: web
-    name: bolpay-backend
-    autoDeployTrigger: checksPass
-    runtime: docker
-    plan: free
-    region: singapore
-    rootDir: backend
-    dockerfilePath: ./Dockerfile
-    healthCheckPath: /health
-    envVars:
-      - key: DATABASE_URL
-        fromDatabase:
-          name: bolpay-postgres
-          property: connectionString
-      - key: POSTGRES_USER
-        fromDatabase:
-          name: bolpay-postgres
-          property: user
-      - key: SPRING_DATASOURCE_PASSWORD
-        fromDatabase:
-          name: bolpay-postgres
-          property: password
-      - key: JWT_SECRET
-        sync: false
-      - key: CASHFREE_WEBHOOK_SECRET
-        sync: false
-      - key: CASHFREE_CLIENT_ID
-        value: bolpay-render-mock
-      - key: CASHFREE_CLIENT_SECRET
-        generateValue: true
-      - key: CASHFREE_BASE_URL
-        fromService:
-          name: bolpay-mock-cashfree
-          type: web
-          envVarKey: RENDER_EXTERNAL_URL
-      - key: ML_SERVICE_URL
-        fromService:
-          name: bolpay-ml-service
-          type: web
-          envVarKey: RENDER_EXTERNAL_URL
-      - key: ML_API_KEY
-        sync: false
-      - key: PAYMENT_GATEWAY
-        value: mock
-      - key: DEMO_OTP
-        value: "false"
-      - key: OTP_RETURN_TO_CLIENT
-        value: "false"
-      - key: INVITE_CODE
-        sync: false
-      - key: PUBLIC_BASE_URL
-        value: https://SET-AFTER-VERCEL-DEPLOY
-      - key: CORS_ALLOWED_ORIGINS
-        value: https://SET-AFTER-VERCEL-DEPLOY
-      - key: EXPIRE_AFTER
-        value: "150"
+projects:
+  - name: Bolpay
+    environments:
+      - name: Production
+        envVarGroups:
+          - name: bolpay-webhook-secret
+            envVars: []
+          - name: bolpay-ml-secret
+            envVars: []
+        services:
+          - type: web
+            name: bolpay-backend
+            autoDeployTrigger: checksPass
+            runtime: docker
+            plan: free
+            region: singapore
+            rootDir: backend
+            dockerfilePath: ./Dockerfile
+            healthCheckPath: /health
+            envVars:
+              - key: SPRING_DATASOURCE_URL
+                sync: false
+              - key: SPRING_DATASOURCE_USERNAME
+                sync: false
+              - key: SPRING_DATASOURCE_PASSWORD
+                sync: false
+              - key: JWT_SECRET
+                sync: false
+              - fromGroup: bolpay-webhook-secret
+              - key: CASHFREE_CLIENT_ID
+                value: bolpay-render-mock
+              - key: CASHFREE_CLIENT_SECRET
+                generateValue: true
+              - key: CASHFREE_BASE_URL
+                fromService:
+                  name: bolpay-mock-cashfree
+                  type: web
+                  envVarKey: RENDER_EXTERNAL_URL
+              - key: ML_SERVICE_URL
+                fromService:
+                  name: bolpay-ml-service
+                  type: web
+                  envVarKey: RENDER_EXTERNAL_URL
+              - fromGroup: bolpay-ml-secret
+              - key: PAYMENT_GATEWAY
+                value: mock
+              - key: DEMO_OTP
+                value: "false"
+              - key: OTP_RETURN_TO_CLIENT
+                value: "false"
+              - key: INVITE_CODE
+                sync: false
+              - key: PUBLIC_BASE_URL
+                value: https://SET-AFTER-VERCEL-DEPLOY
+              - key: CORS_ALLOWED_ORIGINS
+                value: https://SET-AFTER-VERCEL-DEPLOY
+              - key: EXPIRE_AFTER
+                value: "150"
 
-  - type: web
-    name: bolpay-ml-service
-    autoDeployTrigger: checksPass
-    runtime: docker
-    plan: free
-    region: singapore
-    rootDir: ml-service
-    dockerfilePath: ./Dockerfile
-    healthCheckPath: /health
-    envVars:
-      - key: ML_API_KEY
-        sync: false
+          - type: web
+            name: bolpay-ml-service
+            autoDeployTrigger: checksPass
+            runtime: docker
+            plan: free
+            region: singapore
+            rootDir: ml-service
+            dockerfilePath: ./Dockerfile
+            healthCheckPath: /health
+            envVars:
+              - fromGroup: bolpay-ml-secret
 
-  - type: web
-    name: bolpay-mock-cashfree
-    autoDeployTrigger: checksPass
-    runtime: docker
-    plan: free
-    region: singapore
-    rootDir: mock-cashfree
-    dockerfilePath: ./Dockerfile
-    healthCheckPath: /health
-    envVars:
-      - key: BACKEND_URL
-        fromService:
-          name: bolpay-backend
-          type: web
-          envVarKey: RENDER_EXTERNAL_URL
-      - key: CASHFREE_CLIENT_ID
-        fromService:
-          name: bolpay-backend
-          type: web
-          envVarKey: CASHFREE_CLIENT_ID
-      - key: CASHFREE_CLIENT_SECRET
-        fromService:
-          name: bolpay-backend
-          type: web
-          envVarKey: CASHFREE_CLIENT_SECRET
-      - key: CASHFREE_WEBHOOK_SECRET
-        fromService:
-          name: bolpay-backend
-          type: web
-          envVarKey: CASHFREE_WEBHOOK_SECRET
-      - key: MOCK_ADMIN_PASSWORD
-        sync: false
-
-databases:
-  - name: bolpay-postgres
-    plan: free
-    region: singapore
-    databaseName: bolpay
-    user: bolpay
-    postgresMajorVersion: "16"
+          - type: web
+            name: bolpay-mock-cashfree
+            autoDeployTrigger: checksPass
+            runtime: docker
+            plan: free
+            region: singapore
+            rootDir: mock-cashfree
+            dockerfilePath: ./Dockerfile
+            healthCheckPath: /health
+            envVars:
+              - key: BACKEND_URL
+                fromService:
+                  name: bolpay-backend
+                  type: web
+                  envVarKey: RENDER_EXTERNAL_URL
+              - key: CASHFREE_CLIENT_ID
+                fromService:
+                  name: bolpay-backend
+                  type: web
+                  envVarKey: CASHFREE_CLIENT_ID
+              - key: CASHFREE_CLIENT_SECRET
+                fromService:
+                  name: bolpay-backend
+                  type: web
+                  envVarKey: CASHFREE_CLIENT_SECRET
+              - fromGroup: bolpay-webhook-secret
+              - key: MOCK_ADMIN_PASSWORD
+                sync: false

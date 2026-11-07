@@ -1,5 +1,10 @@
 # Changelog
 
+- Replaced Render-managed Postgres with external Neon connection variables, direct-host Flyway guidance, bounded Hikari startup retries, and clear credential-safe JDBC URL validation.
+- Added scoped Render webhook/ML secret environment groups, an environment-only fictional demo seed script, and Neon backup/restore plus recovery documentation.
+- Removed obsolete managed-database expiry claims and recorded that hosted Neon remains unprovisioned and untested.
+- Added a secret-safe startup URL guard and tests, pinned pgJDBC 42.7.14, and verified the local full Docker/Maven/smoke/Playwright gate.
+
 - Replaced the misleading registration evidence with a new screenshot generated using clearly fictional test phone/UPI data, and aligned browser, API, smoke, and attack fixtures with that test-data convention.
 - Added a repository note that vendor names, phone numbers, and UPI IDs are fictional, and removed phone numbers and order codes from backend informational logs.
 - Added a GitHub Actions CI workflow with read-only repository permissions, SHA-pinned actions, dependency caches, disposable generated test credentials, full-history Gitleaks, and short-retention evidence artifacts.
