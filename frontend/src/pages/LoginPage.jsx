@@ -39,7 +39,22 @@ const LoginPage = () => {
       login(response.data);
       navigate(response.data.isNewUser ? '/register' : '/vendor/dashboard');
     } catch (requestError) {
-      setError(requestError.response?.status === 429 ? 'otpRateLimit' : 'otpVerifyError');
+      const status = requestError.response?.status;
+      setError(status === 429 ? 'otpRateLimit' : status === 410 ? 'otpExpired' : status === 400 ? 'otpVerifyError' : 'otpServerError');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleResendOtp = async () => {
+    setError('');
+    setLoading(true);
+    try {
+      const response = await authAPI.sendOtp(phoneNumber);
+      setReceivedOtp(response.data.otp || '');
+      setOtpCode('');
+    } catch {
+      setError('otpSendError');
     } finally {
       setLoading(false);
     }
@@ -73,6 +88,7 @@ const LoginPage = () => {
                   <input id="otp" name="otp" inputMode="numeric" autoComplete="one-time-code" required value={otpCode} onChange={(event) => setOtpCode(event.target.value)} className="field-input text-center text-2xl font-bold tracking-widest" placeholder="••••••" maxLength={6} />
                 </div>
                 {receivedOtp && <p data-testid="local-otp-demo" className="border-l-4 border-status-waiting px-3 py-2 text-small">{t('localOtp')}: {receivedOtp}</p>}
+                <button type="button" className="min-h-target px-2 text-small font-bold underline underline-offset-2" onClick={handleResendOtp} disabled={loading}>{t('resendCode')}</button>
               </>
             )}
             <button type="submit" disabled={loading} className="primary-action w-full">

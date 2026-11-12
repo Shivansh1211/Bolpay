@@ -48,7 +48,6 @@ The Hikari pool is capped at four (`minimumIdle=0`), connection wait is 20 secon
 | `ML_SERVICE_URL` | backend | No | Render ML service public URL reference |
 | `PAYMENT_GATEWAY` | backend | No | Blueprint: `mock` |
 | `DEMO_OTP` | backend | No | Blueprint: `false`; enable only briefly for explicitly labeled demo login, and only with invite code configured |
-| `OTP_RETURN_TO_CLIENT` | backend | No | Blueprint: `false` |
 | `PUBLIC_BASE_URL` | backend | No | Set to exact Vercel production origin after first Vercel deployment |
 | `CORS_ALLOWED_ORIGINS` | backend | No | Set to only the exact Vercel production origin |
 | `EXPIRE_AFTER` | backend | No | Blueprint: `150` seconds for demo order expiry |

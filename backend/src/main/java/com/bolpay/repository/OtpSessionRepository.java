@@ -14,8 +14,12 @@ import java.util.Optional;
 @Repository
 public interface OtpSessionRepository extends JpaRepository<OtpSession, Long> {
 
-    Optional<OtpSession> findFirstByPhoneNumberAndUsedAtIsNullAndExpiresAtAfterOrderByCreatedAtDesc(
+    Optional<OtpSession> findFirstByPhoneNumberAndUsedAtIsNullAndExpiresAtAfterOrderByCreatedAtDescIdDesc(
             String phoneNumber, LocalDateTime now);
+
+    Optional<OtpSession> findFirstByPhoneNumberAndUsedAtIsNullOrderByCreatedAtDescIdDesc(String phoneNumber);
+
+    List<OtpSession> findByPhoneNumberAndUsedAtIsNull(String phoneNumber);
 
     void deleteByExpiresAtBefore(LocalDateTime now);
 }

@@ -391,6 +391,28 @@ public class AttackSuiteTest {
     }
 
     @Test
+    void publicVerifyOtpRouteAcceptsValidCodeWithoutAnExistingSessionToken() {
+        String phone = fakePhoneNumber();
+        String code = authService.sendOtp(phone);
+        ResponseEntity<Map> response = restTemplate.postForEntity("/api/auth/verify-otp",
+                Map.of("phoneNumber", phone, "otpCode", code), Map.class);
+
+        assertEquals(200, response.getStatusCode().value());
+        assertTrue(response.getBody().get("token") instanceof String);
+    }
+
+    @Test
+    void invalidOtpHasAnActionableResponse() {
+        String phone = fakePhoneNumber();
+        ResponseEntity<Map> response = restTemplate.postForEntity("/api/auth/verify-otp",
+                Map.of("phoneNumber", phone, "otpCode", "000000"), Map.class);
+
+        assertEquals(400, response.getStatusCode().value());
+        assertEquals("OTP_INVALID", response.getBody().get("code"));
+        assertTrue(((String) response.getBody().get("message")).contains("could not be verified"));
+    }
+
+    @Test
     void publicVendorResponseOmitsPhoneAndUpi() {
         ResponseEntity<String> response = restTemplate.getForEntity(
                 "/api/vendor/public/vendor/" + testVendor.getSlug(), String.class);

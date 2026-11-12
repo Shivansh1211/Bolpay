@@ -36,24 +36,28 @@ try {
 }
 
 Write-Host '== Build and start services =='
-$previousOtpFlag = $env:OTP_RETURN_TO_CLIENT
+$previousDemoOtp = $env:DEMO_OTP
 $previousExpiryAfter = $env:EXPIRE_AFTER
 $previousExpiryCheck = $env:EXPIRY_CHECK_MS
 $previousCorsOrigins = $env:CORS_ALLOWED_ORIGINS
 $previousInviteCode = $env:INVITE_CODE
-$env:OTP_RETURN_TO_CLIENT = 'true'
-$env:INVITE_CODE = ''
+$previousTestInviteCode = $env:TEST_INVITE_CODE
+$localTestInvite = 'local-' + [guid]::NewGuid().ToString('N')
+$env:DEMO_OTP = 'true'
+$env:INVITE_CODE = $localTestInvite
+$env:TEST_INVITE_CODE = $localTestInvite
 $env:EXPIRE_AFTER = '5'
 $env:EXPIRY_CHECK_MS = '250'
 $env:CORS_ALLOWED_ORIGINS = 'http://localhost:5173,http://frontend'
 try {
     Invoke-Checked 'docker' @('compose', 'up', '--build', '-d')
 } finally {
-    $env:OTP_RETURN_TO_CLIENT = $previousOtpFlag
+    $env:DEMO_OTP = $previousDemoOtp
     $env:EXPIRE_AFTER = $previousExpiryAfter
     $env:EXPIRY_CHECK_MS = $previousExpiryCheck
     $env:CORS_ALLOWED_ORIGINS = $previousCorsOrigins
     $env:INVITE_CODE = $previousInviteCode
+    $env:TEST_INVITE_CODE = $previousTestInviteCode
 }
 
 Write-Host '== Backend tests using disposable PostgreSQL =='
@@ -73,7 +77,11 @@ try {
 }
 
 Write-Host '== Docker/API smoke tests =='
+$env:DEMO_OTP = 'true'
+$env:INVITE_CODE = $localTestInvite
 & "$PSScriptRoot/step1-smoke.ps1"
+$env:DEMO_OTP = $previousDemoOtp
+$env:INVITE_CODE = $previousInviteCode
 if ($LASTEXITCODE -ne 0) { throw 'Step 1 smoke tests failed.' }
 
 Write-Host '== Playwright browser and webhook-to-board tests =='
@@ -82,17 +90,19 @@ $artifactDirectory = Join-Path $PSScriptRoot 'artifacts'
 New-Item -ItemType Directory -Path $artifactDirectory -Force | Out-Null
 $artifactMount = (Resolve-Path $artifactDirectory).Path.Replace('\', '/')
 Invoke-Checked 'docker' @('build', '-f', 'tests/e2e/Dockerfile', '-t', $playwrightImage, 'tests/e2e')
-Invoke-Checked 'docker' @('run', '--rm', '--network', 'bolpay_internal', '-e', 'API_URL=http://backend:8080', '-e', 'MOCK_URL=http://mock-cashfree:9000', '-e', 'FRONTEND_URL=http://frontend', '-e', 'PLAYWRIGHT_SCREENSHOT_DIR=/results', '-e', 'PLAYWRIGHT_METRICS_PATH=/results/latency.json', '-v', "${artifactMount}:/results", $playwrightImage)
+Invoke-Checked 'docker' @('run', '--rm', '--network', 'bolpay_internal', '-e', 'API_URL=http://backend:8080', '-e', 'MOCK_URL=http://mock-cashfree:9000', '-e', 'FRONTEND_URL=http://frontend', '-e', "TEST_INVITE_CODE=$localTestInvite", '-e', 'PLAYWRIGHT_SCREENSHOT_DIR=/results', '-e', 'PLAYWRIGHT_METRICS_PATH=/results/latency.json', '-v', "${artifactMount}:/results", $playwrightImage)
 Write-Host 'PASS: Playwright customer flow, vendor live board, voice announcement, screenshots, and webhook latency samples'
 
 Write-Host '== Restore manual-test order expiry =='
-$env:OTP_RETURN_TO_CLIENT = 'true'
+$env:DEMO_OTP = 'true'
+$env:INVITE_CODE = $localTestInvite
 $env:EXPIRE_AFTER = '150'
 $env:EXPIRY_CHECK_MS = '30000'
 try {
     Invoke-Checked 'docker' @('compose', 'up', '-d', '--force-recreate', 'backend')
 } finally {
-    $env:OTP_RETURN_TO_CLIENT = $previousOtpFlag
+    $env:DEMO_OTP = $previousDemoOtp
+    $env:INVITE_CODE = $previousInviteCode
     $env:EXPIRE_AFTER = $previousExpiryAfter
     $env:EXPIRY_CHECK_MS = $previousExpiryCheck
 }

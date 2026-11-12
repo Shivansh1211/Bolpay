@@ -46,8 +46,6 @@ projects:
                 value: mock
               - key: DEMO_OTP
                 value: "false"
-              - key: OTP_RETURN_TO_CLIENT
-                value: "false"
               - key: INVITE_CODE
                 sync: false
               - key: PUBLIC_BASE_URL

@@ -35,17 +35,17 @@ function New-SmokeVendorAndOrder {
     $suffix = [Guid]::NewGuid().ToString('N').Substring(0, 8)
     $phone = '900000' + (Get-Random -Minimum 0 -Maximum 10000).ToString('D4')
     $otpResponse = Invoke-RestMethod -Method Post -Uri "$BaseUrl/api/auth/send-otp" -ContentType 'application/json' -Body (@{ phoneNumber = $phone } | ConvertTo-Json)
-    if (-not $otpResponse.otp) { throw 'OTP was not returned; the test-only OTP_RETURN_TO_CLIENT flag is required for this smoke test.' }
+    if (-not $otpResponse.otp) { throw 'OTP was not returned; the test-only DEMO_OTP flag is required for this smoke test.' }
     $auth = Invoke-RestMethod -Method Post -Uri "$BaseUrl/api/auth/verify-otp" -ContentType 'application/json' -Body (@{ phoneNumber = $phone; otpCode = $otpResponse.otp } | ConvertTo-Json)
     $vendorBody = @{
         phoneNumber = $phone
         upiId = "demo.smoke.$suffix@examplebank"
-        businessName = "Smoke Vendor $suffix"
+        businessName = "ZZ-TEST-Smoke-$suffix"
         slug = "smoke-$suffix"
         description = 'Step 1 API smoke test'
     } | ConvertTo-Json
 
-    $vendor = Invoke-RestMethod -Method Post -Uri "$BaseUrl/api/vendor/register" -Headers @{ Authorization = "Bearer $($auth.token)" } -ContentType 'application/json' -Body $vendorBody
+    $vendor = Invoke-RestMethod -Method Post -Uri "$BaseUrl/api/vendor/register" -Headers @{ Authorization = "Bearer $($auth.token)"; 'X-Invite-Code' = $env:INVITE_CODE } -ContentType 'application/json' -Body $vendorBody
     if ($vendor.slug -ne "smoke-$suffix") { throw 'Vendor registration did not return the requested slug.' }
 
     $orderBody = @{ vendorSlug = $vendor.slug; amount = 60.00 } | ConvertTo-Json
@@ -62,6 +62,7 @@ $network = docker inspect --format '{{range $name,$cfg := .NetworkSettings.Netwo
 if ($LASTEXITCODE -ne 0 -or -not $network) { throw 'Could not find the running Compose internal network.' }
 $dbName = 'bolpay-step1-smoke-db'
 $backendName = 'bolpay-step1-smoke-backend'
+$smokeInviteCode = if (-not [string]::IsNullOrWhiteSpace($env:INVITE_CODE)) { $env:INVITE_CODE } else { 'smoke-' + [guid]::NewGuid().ToString('N') }
 
 try {
     Invoke-CheckedDocker @(
@@ -86,7 +87,7 @@ try {
         '-e', 'PAYMENT_GATEWAY=mock', '-e', 'CASHFREE_BASE_URL=http://mock-cashfree:9000',
         '-e', 'CASHFREE_CLIENT_ID=bolpay-mock-client', '-e', 'CASHFREE_CLIENT_SECRET=bolpay-mock-client-secret',
         '-e', 'CASHFREE_WEBHOOK_SECRET=bolpay-mock-webhook-secret',
-        '-e', 'OTP_RETURN_TO_CLIENT=true',
+        '-e', 'DEMO_OTP=true', '-e', "INVITE_CODE=$smokeInviteCode",
         'bolpay-backend'
     ) | Out-Null
     Write-Host 'Starting backend against the empty smoke database...'
@@ -99,6 +100,8 @@ try {
     }
     Write-Host 'PASS: Flyway applied V1-V8 successfully to an empty database.'
 
+    $previousInvite = $env:INVITE_CODE
+    $env:INVITE_CODE = $smokeInviteCode
     $flow = New-SmokeVendorAndOrder 'http://localhost:18080'
     Write-Host "PASS: API created vendor '$($flow.Vendor.slug)' and order with a valid token and payment_session_id (values withheld)."
     $scan = Invoke-RestMethod -Method Post -Uri "http://localhost:18080/api/public/scan/$($flow.Vendor.slug)" -ContentType 'application/json' -Body '{"deviceId":"step1-smoke-browser"}'
@@ -134,5 +137,6 @@ try {
     Write-Host 'STEP 1 SMOKE TESTS PASSED.'
 }
 finally {
+    $env:INVITE_CODE = $previousInvite
     docker rm -f $backendName $dbName 2>$null | Out-Null
 }

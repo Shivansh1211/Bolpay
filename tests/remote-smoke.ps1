@@ -23,6 +23,7 @@ function Check([string]$Name, [scriptblock]$Action) {
 }
 
 function Get-PrivateInviteCode {
+    if (-not [string]::IsNullOrWhiteSpace($env:BOLPAY_INVITE_CODE)) { return $env:BOLPAY_INVITE_CODE }
     $secure = Read-Host 'Render INVITE_CODE (input hidden)' -AsSecureString
     $ptr = [Runtime.InteropServices.Marshal]::SecureStringToBSTR($secure)
     try { [Runtime.InteropServices.Marshal]::PtrToStringBSTR($ptr) }
@@ -111,7 +112,7 @@ if ($demoReady) {
             -Body (@{ phoneNumber = $phone; otpCode = $otpProof } | ConvertTo-Json -Compress) -TimeoutSec 45
         $proofToken = [string]$verified.token
         $profile = @{
-            phoneNumber = $phone; upiId = "demo.$slug@examplebank"; businessName = 'BolPay Remote Smoke'; slug = $slug
+            phoneNumber = $phone; upiId = "demo.$slug@examplebank"; businessName = "ZZ-TEST-$slug"; slug = $slug
             description = 'Synthetic deployment smoke-test vendor'; bannerUrl = ''; menuItems = ''
         } | ConvertTo-Json -Compress
         $vendor = Invoke-RestMethod -Method Post -Uri "$BackendUrl/api/vendor/register" -ContentType 'application/json' `

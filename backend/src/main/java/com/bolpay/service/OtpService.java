@@ -12,6 +12,7 @@ import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.security.SecureRandom;
 import java.time.LocalDateTime;
+import java.util.List;
 import io.github.bucket4j.Bandwidth;
 import io.github.bucket4j.Bucket;
 import io.github.bucket4j.Refill;
@@ -49,6 +50,13 @@ public class OtpService {
         // Generate 6-digit OTP
         String otpCode = String.format("%0" + OTP_LENGTH + "d", random.nextInt((int) Math.pow(10, OTP_LENGTH)));
 
+        LocalDateTime now = LocalDateTime.now();
+        List<OtpSession> previousSessions = otpSessionRepository.findByPhoneNumberAndUsedAtIsNull(phoneNumber);
+        for (OtpSession previousSession : previousSessions) {
+            previousSession.setUsedAt(now);
+        }
+        if (!previousSessions.isEmpty()) otpSessionRepository.saveAll(previousSessions);
+
         // Hash OTP before storing
         String hashedOtp = hashOtp(otpCode);
 
@@ -74,15 +82,21 @@ public class OtpService {
      */
     @Transactional
     public boolean verifyOtp(String phoneNumber, String otpCode) {
+        LocalDateTime now = LocalDateTime.now();
         if (verifyFailures.getOrDefault(phoneNumber, new AtomicInteger()).get() >= 5) {
             throw new OtpAttemptLimitException("Too many incorrect codes. Request a new code.");
         }
 
         OtpSession session = otpSessionRepository
-                .findFirstByPhoneNumberAndUsedAtIsNullAndExpiresAtAfterOrderByCreatedAtDesc(
-                        phoneNumber, LocalDateTime.now())
+                .findFirstByPhoneNumberAndUsedAtIsNullAndExpiresAtAfterOrderByCreatedAtDescIdDesc(phoneNumber, now)
                 .orElse(null);
         if (session == null) {
+            OtpSession mostRecentUnused = otpSessionRepository
+                    .findFirstByPhoneNumberAndUsedAtIsNullOrderByCreatedAtDescIdDesc(phoneNumber)
+                    .orElse(null);
+            if (mostRecentUnused != null && !mostRecentUnused.getExpiresAt().isAfter(now)) {
+                throw new OtpExpiredException();
+            }
             return false;
         }
 

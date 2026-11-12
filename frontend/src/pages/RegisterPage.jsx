@@ -55,9 +55,25 @@ const RegisterPage = () => {
         setReceivedOtp('');
       }
     } catch (requestError) {
-      if (requestError.response?.status === 429) setError('otpRateLimit');
-      else if (requestError.response?.status === 400) setError('otpVerifyError');
-      else setError('registerError');
+      const status = requestError.response?.status;
+      if (status === 429) setError('otpRateLimit');
+      else if (status === 410) setError('otpExpired');
+      else if (status === 400) setError('otpVerifyError');
+      else setError('otpServerError');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleResendOtp = async () => {
+    setError('');
+    setLoading(true);
+    try {
+      const response = await authAPI.sendOtp(formData.phoneNumber);
+      setReceivedOtp(response.data.otp || '');
+      setOtpCode('');
+    } catch {
+      setError('otpSendError');
     } finally {
       setLoading(false);
     }
@@ -81,6 +97,7 @@ const RegisterPage = () => {
                 <label htmlFor="registrationOtp" className="field-label">{t('otpCode')}</label>
                 <input id="registrationOtp" name="registrationOtp" inputMode="numeric" autoComplete="one-time-code" maxLength={6} required value={otpCode} onChange={(event) => setOtpCode(event.target.value)} className="field-input text-center text-2xl font-bold tracking-widest" />
                 {receivedOtp && <p data-testid="local-otp-demo" className="mt-2 border-l-4 border-status-waiting px-3 py-2 text-small">{t('localOtp')}: {receivedOtp}</p>}
+                <button type="button" className="min-h-target px-2 text-small font-bold underline underline-offset-2" onClick={handleResendOtp} disabled={loading}>{t('resendCode')}</button>
               </div>
             )}
             <div>

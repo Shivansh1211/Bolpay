@@ -5,6 +5,7 @@ import path from 'node:path';
 const apiUrl = process.env.API_URL;
 const mockUrl = process.env.MOCK_URL;
 const frontendUrl = process.env.FRONTEND_URL;
+const inviteCode = process.env.TEST_INVITE_CODE;
 const screenshotDir = process.env.PLAYWRIGHT_SCREENSHOT_DIR || '/results';
 const metricsPath = process.env.PLAYWRIGHT_METRICS_PATH || path.join(screenshotDir, 'latency.json');
 const samples = [];
@@ -17,7 +18,7 @@ let vendorAuth;
 const fakePhoneNumber = () => `900000${String(Math.floor(Math.random() * 10_000)).padStart(4, '0')}`;
 
 test.beforeAll(async () => {
-  if (!apiUrl || !mockUrl || !frontendUrl) throw new Error('Playwright service URLs were not configured.');
+  if (!apiUrl || !mockUrl || !frontendUrl || !inviteCode) throw new Error('Playwright service URLs or local test fixture were not configured.');
   api = await request.newContext({ baseURL: apiUrl });
   mock = await request.newContext({ baseURL: mockUrl });
 
@@ -37,11 +38,11 @@ test.beforeAll(async () => {
   if (!registrationProof.ok()) throw new Error('Test OTP verification for vendor registration failed.');
   const proof = await registrationProof.json();
   const register = await api.post('/api/vendor/register', {
-    headers: { Authorization: `Bearer ${proof.token}` },
+      headers: { Authorization: `Bearer ${proof.token}`, 'X-Invite-Code': inviteCode },
     data: {
       phoneNumber,
       upiId: `demo.vendor.${suffix}@examplebank`,
-      businessName: 'E2E Vendor',
+      businessName: `ZZ-TEST-E2E-${suffix}`,
       slug: `e2e-${suffix}`,
       description: 'Automated browser test vendor',
     },
@@ -75,13 +76,13 @@ test.afterAll(async () => {
 test('vendor registers and signs in through the UI, with OTP errors and Hindi switching', async ({ page }) => {
   fs.mkdirSync(screenshotDir, { recursive: true });
   const phoneNumber = fakePhoneNumber();
-  const businessName = 'UI Registration Stall';
+  const businessName = 'ZZ-TEST-UI-Registration';
   const upiId = 'demo.vendor@examplebank';
   const firstSlug = `ui-${Math.random().toString(36).slice(2, 9)}`;
   const screenshot = async (fileName) => {
     await page.screenshot({ path: path.join(screenshotDir, fileName), fullPage: true });
   };
-  const hideTestSecrets = async () => page.addStyleTag({ content: '[data-testid="local-otp-demo"] { visibility: hidden !important; } input[autocomplete="one-time-code"] { color: transparent !important; text-shadow: none !important; }' });
+  const hideTestSecrets = async () => page.addStyleTag({ content: '[data-testid="local-otp-demo"] { visibility: hidden !important; } input[autocomplete="one-time-code"], #inviteCode { color: transparent !important; text-shadow: none !important; }' });
   const readLocalOtpForTest = async () => {
     const text = await page.getByTestId('local-otp-demo').textContent();
     const code = text?.match(/\b\d{6}\b/)?.[0];
@@ -102,6 +103,7 @@ test('vendor registers and signs in through the UI, with OTP errors and Hindi sw
   await page.getByLabel('Phone number').fill(phoneNumber);
   await page.getByLabel('Business name').fill(businessName);
   await page.getByLabel('UPI ID').fill(upiId);
+  await page.getByLabel('Invite code').fill(inviteCode);
   await page.getByLabel('Custom link ending (optional)').fill(firstSlug);
   await expect(page.getByLabel('Phone number')).toHaveValue(phoneNumber);
   await expect(page.getByLabel('UPI ID')).toHaveValue(upiId);
@@ -117,8 +119,9 @@ test('vendor registers and signs in through the UI, with OTP errors and Hindi sw
 
   await page.goto(`${frontendUrl}/register`);
   const duplicatePhone = fakePhoneNumber();
-  await page.getByLabel('Business name').fill('Duplicate Link Test Stall');
+  await page.getByLabel('Business name').fill('ZZ-TEST-Duplicate-Link');
   await page.getByLabel('UPI ID').fill('demo.duplicate@examplebank');
+  await page.getByLabel('Invite code').fill(inviteCode);
   await page.getByLabel('Custom link ending (optional)').fill(firstSlug);
   const duplicateOtp = await requestUiOtp(duplicatePhone, 'Send verification code');
   await page.getByLabel('One-time code').fill(duplicateOtp);
@@ -172,9 +175,9 @@ test('scan, pending, verified payment, and abandoned order lifecycle', async ({ 
   fs.mkdirSync(screenshotDir, { recursive: true });
   const context = page.context();
   const traceBrowserPage = (browserPage) => {
-    browserPage.on('pageerror', (error) => console.error(`BROWSER_PAGE_ERROR: ${error.message}\n${error.stack || ''}`));
+    browserPage.on('pageerror', () => console.error('BROWSER_PAGE_ERROR'));
     browserPage.on('console', (message) => {
-      if (message.type() === 'error') console.error(`BROWSER_CONSOLE_ERROR: ${message.text()}`);
+      if (message.type() === 'error') console.error('BROWSER_CONSOLE_ERROR');
     });
     browserPage.on('websocket', (socket) => {
       console.error(`BROWSER_WEBSOCKET_OPEN: ${new URL(socket.url()).pathname}`);
@@ -186,9 +189,6 @@ test('scan, pending, verified payment, and abandoned order lifecycle', async ({ 
         const commands = ['CONNECTED', 'MESSAGE', 'ERROR', 'CONNECT', 'STOMP', 'SUBSCRIBE'];
         const observed = commands.find((command) => new RegExp(`(?:^|\\n)${command}\\n`).test(packet));
         if (observed === 'ERROR') {
-          fs.mkdirSync(screenshotDir, { recursive: true });
-          fs.appendFileSync(path.join(screenshotDir, 'ws-error-frame.log'),
-            `${new Date().toISOString()} direction=${direction}\n${packet}\n\n`, { encoding: 'utf8', mode: 0o600 });
           const message = packet.split('\n').find((line) => line.startsWith('message:'))?.slice('message:'.length).trim();
           const safeMessage = message && /^[A-Za-z ._-]{1,100}$/.test(message) ? message : 'unavailable';
           console.error(`BROWSER_WEBSOCKET_${direction}: ERROR (${safeMessage})`);
@@ -241,7 +241,7 @@ test('scan, pending, verified payment, and abandoned order lifecycle', async ({ 
   await expect(dashboard.getByRole('button', { name: 'Voice On' })).toHaveAttribute('aria-pressed', 'true');
 
   await dashboard.goto(`${frontendUrl}/vendor/qr`);
-  await expect(dashboard.getByRole('heading', { name: 'E2E Vendor' })).toBeVisible();
+  await expect(dashboard.getByRole('heading', { name: new RegExp(`ZZ-TEST-E2E-${vendor.slug.replace(/^e2e-/, '')}`) })).toBeVisible();
   await expect(dashboard.getByText(vendor.upiId, { exact: false })).toBeVisible();
   await expect(dashboard.locator('canvas')).toBeVisible();
   await dashboard.screenshot({ path: path.join(screenshotDir, '00-vendor-qr-card.png'), fullPage: true });
@@ -254,7 +254,7 @@ test('scan, pending, verified payment, and abandoned order lifecycle', async ({ 
   await customer.goto(`${frontendUrl}/v/${vendor.slug}`);
   const scanResponse = await scanResponsePromise;
   if (!scanResponse.ok()) throw new Error('Public scan tracking request failed.');
-  await expect(customer.getByRole('heading', { name: 'E2E Vendor' })).toBeVisible();
+  await expect(customer.getByRole('heading', { name: new RegExp(`ZZ-TEST-E2E-${vendor.slug.replace(/^e2e-/, '')}`) })).toBeVisible();
   await customer.screenshot({ path: path.join(screenshotDir, '02-customer-scan.png'), fullPage: true });
 
   await expect(dashboard.getByTestId('scan-count')).toHaveText('1');
@@ -383,7 +383,7 @@ test('scan, pending, verified payment, and abandoned order lifecycle', async ({ 
   expect(friendlyAnnouncement.pitch).toBeCloseTo(1.04, 2);
 
   await customer.goto(`${frontendUrl}/v/${vendor.slug}`);
-  await expect(customer.getByRole('heading', { name: 'E2E Vendor' })).toBeVisible();
+  await expect(customer.getByRole('heading', { name: new RegExp(`ZZ-TEST-E2E-${vendor.slug.replace(/^e2e-/, '')}`) })).toBeVisible();
   await customer.getByLabel('Enter amount').fill('13.50');
   const abandonedOrderResponse = customer.waitForResponse((response) =>
     response.request().method() === 'POST' && response.url().includes('/api/orders/create'));

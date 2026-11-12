@@ -46,7 +46,6 @@ vendor:
 cors:
   allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:5173}
 otp:
-  return-to-client: ${OTP_RETURN_TO_CLIENT:false}
   demo-enabled: ${DEMO_OTP:false}
 registration:
   invite-code: ${INVITE_CODE:}

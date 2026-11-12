@@ -1,0 +1,39 @@
+{
+  "sendRequests": [
+    {
+      "fields": [
+        "phoneNumber"
+      ],
+      "phoneDigitsOnly": true,
+      "hasCountryCode": false
+    }
+  ],
+  "sendResponse": {
+    "status": 200,
+    "fields": [
+      "message",
+      "mode",
+      "otp"
+    ],
+    "safeMessage": "OTP sent successfully",
+    "codeReturned": true,
+    "codeLength": 6,
+    "uiDisplaysSixDigits": true
+  },
+  "verifyRequests": [
+    {
+      "fields": [
+        "otpCode",
+        "phoneNumber"
+      ],
+      "phoneDigitsOnly": true,
+      "hasCountryCode": false,
+      "codeLength": 6,
+      "codeDigitsOnly": true,
+      "codeTrimmed": true
+    }
+  ],
+  "verifyResponseStatus": 403,
+  "consoleErrorCount": 0,
+  "pageErrorCount": 0
+}

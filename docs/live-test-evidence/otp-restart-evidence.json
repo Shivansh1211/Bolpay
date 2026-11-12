@@ -1,0 +1,17 @@
+{
+  "sendStatus": 200,
+  "sendFields": [
+    "message",
+    "mode",
+    "otp"
+  ],
+  "sendReturnedSixDigitCode": true,
+  "sendRequestsPerClick": 1,
+  "sendRequestFields": [
+    "phoneNumber"
+  ],
+  "phoneDigitsOnly": true,
+  "backendRestartedBetweenSendAndVerify": true,
+  "verifyStatus": 200,
+  "pageErrorCount": 0
+}

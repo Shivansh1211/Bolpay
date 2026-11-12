@@ -1,0 +1,31 @@
+{
+  "run": "tests/run-all.ps1",
+  "target": "local Docker Compose and disposable PostgreSQL",
+  "backendTests": {
+    "run": 40,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0
+  },
+  "databaseSmoke": {
+    "migrations": "V1-V8 applied to an empty disposable database",
+    "syntheticVendors": 2,
+    "orderAndMockCheckout": "passed",
+    "scanPersistence": "passed",
+    "protectedMockPaths": "404 as expected"
+  },
+  "playwright": {
+    "testsPassed": 2,
+    "testsFailed": 0,
+    "flows": ["vendor registration and login", "scan, payment, and abandoned order lifecycle"]
+  },
+  "webhookToBoardLatency": {
+    "environment": "local only; not a hosted measurement",
+    "sampleCount": 20,
+    "p50Ms": 69,
+    "p95Ms": 77
+  },
+  "hostedOtpBrowserEvidence": "See otp-live-evidence.json; verify returned HTTP 403",
+  "localRestartOtpEvidence": "See otp-restart-evidence.json; verify returned HTTP 200 after backend restart",
+  "secretsOrOtpValuesRecorded": false
+}
