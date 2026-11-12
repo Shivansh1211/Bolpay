@@ -12,7 +12,6 @@ import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.security.SecureRandom;
 import java.time.LocalDateTime;
-import java.util.List;
 import io.github.bucket4j.Bandwidth;
 import io.github.bucket4j.Bucket;
 import io.github.bucket4j.Refill;
@@ -75,19 +74,17 @@ public class OtpService {
      */
     @Transactional
     public boolean verifyOtp(String phoneNumber, String otpCode) {
-        List<OtpSession> validSessions = otpSessionRepository
-                .findByPhoneNumberAndUsedAtIsNullAndExpiresAtAfter(phoneNumber, LocalDateTime.now());
-
         if (verifyFailures.getOrDefault(phoneNumber, new AtomicInteger()).get() >= 5) {
             throw new OtpAttemptLimitException("Too many incorrect codes. Request a new code.");
         }
 
-        if (validSessions.isEmpty()) {
+        OtpSession session = otpSessionRepository
+                .findFirstByPhoneNumberAndUsedAtIsNullAndExpiresAtAfterOrderByCreatedAtDesc(
+                        phoneNumber, LocalDateTime.now())
+                .orElse(null);
+        if (session == null) {
             return false;
         }
-
-        // Check the most recent session
-        OtpSession session = validSessions.get(validSessions.size() - 1);
 
         // Hash the provided OTP and compare
         String hashedOtp = hashOtp(otpCode);
