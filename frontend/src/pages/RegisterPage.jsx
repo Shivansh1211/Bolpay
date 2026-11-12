@@ -1,11 +1,12 @@
 import { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { authAPI, vendorAPI } from '../services/api';
 import { useAuth } from '../contexts/useAuth';
 import { LanguageSelect, useTranslation } from '../i18n';
 
 const RegisterPage = () => {
-  const [formData, setFormData] = useState({ phoneNumber: '', upiId: '', businessName: '', slug: '', description: '', bannerUrl: '', menuItems: '' });
+  const location = useLocation();
+  const [formData, setFormData] = useState(() => ({ phoneNumber: location.state?.phoneNumber || '', upiId: '', businessName: '', slug: '', description: '', bannerUrl: '', menuItems: '' }));
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [otpRequested, setOtpRequested] = useState(false);
@@ -34,7 +35,8 @@ const RegisterPage = () => {
         return;
       }
       const verified = await authAPI.verifyOtp(formData.phoneNumber, otpCode);
-      if (!verified.data.isNewUser && verified.data.vendor) {
+      const isNewUser = verified.data.isNewUser ?? verified.data.newUser ?? !verified.data.vendor;
+      if (!isNewUser && verified.data.vendor) {
         login(verified.data);
         navigate('/vendor/dashboard');
         return;

@@ -36,8 +36,13 @@ const LoginPage = () => {
     setLoading(true);
     try {
       const response = await authAPI.verifyOtp(phoneNumber, otpCode);
+      const isNewUser = response.data.isNewUser ?? response.data.newUser ?? !response.data.vendor;
+      if (isNewUser || !response.data.vendor) {
+        navigate('/register', { state: { phoneNumber } });
+        return;
+      }
       login(response.data);
-      navigate(response.data.isNewUser ? '/register' : '/vendor/dashboard');
+      navigate('/vendor/dashboard');
     } catch (requestError) {
       const status = requestError.response?.status;
       setError(status === 429 ? 'otpRateLimit' : status === 410 ? 'otpExpired' : status === 400 ? 'otpVerifyError' : 'otpServerError');

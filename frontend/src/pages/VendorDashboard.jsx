@@ -59,7 +59,7 @@ const OrderRow = ({ order, type, t }) => {
 };
 
 const VendorDashboard = () => {
-  const { user, logout } = useAuth();
+  const { user, loading: authLoading, logout } = useAuth();
   const navigate = useNavigate();
   const [boardData, setBoardData] = useState({
     payingNow: 0,
@@ -77,6 +77,10 @@ const VendorDashboard = () => {
   const [glanceMode, setGlanceMode] = useState(false);
   const [scanCount, setScanCount] = useState(0);
   const [recentScan, setRecentScan] = useState(false);
+
+  useEffect(() => {
+    if (!authLoading && !user?.id) navigate('/login', { replace: true });
+  }, [authLoading, user, navigate]);
 
   useEffect(() => {
     // Fetch board data
@@ -192,6 +196,10 @@ const VendorDashboard = () => {
   const quickCheckLabel = quickCheckResult?.status === 'PAID' ? t('paid')
     : quickCheckResult?.status === 'EXPIRED' ? t('expired')
       : quickCheckResult?.status === 'LATE_PAID' ? t('latePayment') : t('waiting');
+
+  if (authLoading || !user?.id) {
+    return <main className="app-shell min-h-screen p-6" role="status">Checking your sign-in…</main>;
+  }
 
   return (
     <div className="app-shell">
