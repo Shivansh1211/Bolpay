@@ -25,6 +25,7 @@ import java.util.List;
 import java.security.SecureRandom;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Locale;
 
 /**
  * Service for order operations
@@ -141,8 +142,10 @@ public class OrderService {
      * Get order by token and vendor (for quick check)
      */
     public OrderDto getOrderByTokenAndVendor(String token, Long vendorId) {
-        Order order = orderRepository.findByVendorIdAndTokenAndStatus(vendorId, token, Order.OrderStatus.PENDING)
-                .orElseGet(() -> orderRepository.findByVendorIdAndOrderCode(vendorId, token).orElse(null));
+        String lookup = token == null ? "" : token.trim().toUpperCase(Locale.ROOT);
+        Order order = orderRepository.findByVendorIdAndTokenAndStatus(vendorId, lookup, Order.OrderStatus.PENDING)
+                .orElseGet(() -> orderRepository.findFirstByVendorIdAndTokenOrderByCreatedAtDesc(vendorId, lookup)
+                        .orElseGet(() -> orderRepository.findByVendorIdAndOrderCode(vendorId, lookup).orElse(null)));
         return order == null ? null : mapToDto(order);
     }
 

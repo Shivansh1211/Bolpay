@@ -65,6 +65,8 @@ public interface OrderRepository extends JpaRepository<Order, Long> {
 
     Optional<Order> findByVendorIdAndTokenAndStatus(Long vendorId, String token, Order.OrderStatus status);
 
+    Optional<Order> findFirstByVendorIdAndTokenOrderByCreatedAtDesc(Long vendorId, String token);
+
     Optional<Order> findByVendorIdAndOrderCode(Long vendorId, String orderCode);
 
     List<Order> findByStatusAndEscalateAtBefore(Order.OrderStatus status, LocalDateTime now);
